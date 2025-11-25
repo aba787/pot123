@@ -1,0 +1,196 @@
+أولاً: المتطلبات الأساسية (Prerequisites)
+
+✓ برمجياً:
+ • Python
+ • مكتبات NLP:
+ • Transformers (من HuggingFace)
+ • scikit-learn
+ • pandas / numpy
+
+✓ أدوات:
+ • Jupyter Notebook أو VS Code
+ • حساب في HuggingFace
+ • منصة نشر بسيطة (Flask أو Streamlit)
+
+⸻
+
+1️⃣ اختيار النموذج (Model Selection)
+
+لأن مشروعك متعدد اللغات، تحتاجين نموذج يفهم عربي + إنجليزي.
+
+أفضل النماذج المقترحة:
+
+✔ mBERT — Multilingual BERT
+ • ممتاز للغات كثيرة
+ • قوي في التصنيف (intent classification)
+
+✔ XLM-Roberta
+ • أفضل أداء من mBERT
+ • لكنه أثقل شوي
+
+✔ GPT-based models عبر API (اختياري)
+
+هذا إذا تبين شات ذكي جدًا
+لكنه ما يناسب المشروع الأكاديمي لأنهم يبغون تدريب فعلي على نموذج Transformer.
+
+إذن… أفضل اختيار لك → mBERT
+
+⸻
+
+2️⃣ جمع البيانات Dataset
+
+✔ المطلوب:
+ • بيانات أسئلة دعم العملاء EN + AR
+ • 1000–3000 سطر كحد أدنى
+ • كل سطر يحتوي:
+ • النص
+ • اللغة
+ • التصنيف (intent)
+
+✔ مصادر جاهزة:
+ • Arabic Open Dataset
+ • English Customer Support Dataset
+ • Kaggle bilingual dataset
+ • Twitter customer care datasets
+
+✔ أو تبنين Dataset بنفسك:
+
+مثال intent labels:
+ • Order Status
+ • Refund Request
+ • Product Information
+ • Greeting
+ • Complaint
+ • Shipping Inquiry
+ • Technical Support
+
+⸻
+
+3️⃣ تنظيف وتجهيز البيانات (Preprocessing)
+
+تحتاجين تعملين:
+
+✓ إزالة علامات غير ضرورية
+
+✓ تحويل النص لصيغة موحدة
+
+✓ Tokenization
+
+(من نفس tokenizer للموديل مثل mBERT tokenizer)
+
+✓ Language Detection
+
+(اختياري إذا البيانات مخلوطة)
+
+✓ تقسيم البيانات:
+ • Train 80%
+ • Test 20%
+
+⸻
+
+4️⃣ بناء نموذج تصنيف النوايا Intent Classification
+
+هذا هو قلب الشات بوت.
+
+الخطوات:
+ 1. تحميل mBERT
+ 2. Fine-tuning على بيانات intent
+ 3. تدريب 3–5 epochs
+ 4. استخراج المعايير التالية:
+ • Accuracy
+ • Precision
+ • Recall
+ • F1-score
+ • Confusion Matrix
+
+هذا الجزء لازم يظهر في تقريرك.
+
+⸻
+
+5️⃣ بناء جزء الردود Response Generation
+
+عندك خيارين:
+
+⸻
+
+✔ الخيار A: ردود جاهزة Rule-based
+
+إذا كانت النوايا محددة.
+
+مثال:
+ • intent = “Order Status” → “Please provide your order number.”
+ • intent = “Refund Request” → “Refunds are processed within 3–5 days.”
+
+هذا يكفي لمشروع أكاديمي.
+
+⸻
+
+✔ الخيار B: نموذج يولّد ردود ML
+
+تستخدمين mBERT فقط للتصنيف
+وفي الرد تستخدمين نموذج صغير مثل:
+ • DialoGPT small
+ • أو GPT عبر API
+
+لكن هذا اختياري.
+
+⸻
+
+6️⃣ دمج النموذج في Chatbot
+
+تسوين نظام بسيط:
+
+User Input → Detect Language → Model Predict Intent → Reply
+
+التنفيذ يكون عبر:
+ • Flask API
+أو
+ • Streamlit واجهة مستخدم سهلة
+
+هذا يكفي جدًا.
+
+⸻
+
+7️⃣ الاختبار والتقييم Evaluation
+
+تحتاجين:
+
+✓ 20–50 سؤال حقيقي (عربي + إنجليزي)
+
+تشغلين النموذج + تقارنين الردود.
+
+✓ تعرضين النتائج في العرض:
+ • Confusion Matrix
+ • F1-score
+ • Accuracy Comparison
+ • Examples of correct & incorrect predictions
+
+⸻
+
+8️⃣ التسليم النهائي (Final Submission)
+
+تحتاجين تسلمين:
+
+✔ 1. ملف التقرير (Final Report)
+ • Abstract
+ • Introduction
+ • Problem
+ • Objectives
+ • Dataset
+ • Methodology
+ • Results
+ • Conclusion
+ • Future Work
+
+✔ 2. السورس كود
+
+ملف Python أو Notebook.
+
+✔ 3. البوربوينت
+ • فكرة المشروع
+ • المنهجية
+ • النتائج
+ • Demo
+ • الخاتمة
+
+✔ 4. Demo جاهز
