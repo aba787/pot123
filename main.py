@@ -1,4 +1,3 @@
-
 import streamlit as st
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
@@ -15,17 +14,17 @@ class MultilingualMedicalChatbot:
     def __init__(self):
         self.setup_models()
         self.setup_intents()
-        
+
     def setup_models(self):
         """Initialize mBERT model for intent classification"""
         try:
             # Use mBERT for multilingual intent classification
             self.tokenizer = AutoTokenizer.from_pretrained('bert-base-multilingual-cased')
-            
+
             # For demo purposes, we'll use a simple classification approach
             # In production, you would fine-tune mBERT on your specific dataset
             self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-            
+
             # Initialize text classification pipeline
             self.classifier = pipeline(
                 "text-classification",
@@ -33,12 +32,12 @@ class MultilingualMedicalChatbot:
                 tokenizer=self.tokenizer,
                 device=0 if torch.cuda.is_available() else -1
             )
-            
+
             st.success("✅ mBERT model loaded successfully!")
-            
+
         except Exception as e:
             st.error(f"Error loading model: {str(e)}")
-            
+
     def setup_intents(self):
         """Define medical intents in both Arabic and English"""
         self.intents = {
@@ -67,7 +66,7 @@ class MultilingualMedicalChatbot:
                 "ar": ["مرحبا", "أهلا", "صباح الخير", "مساء الخير", "كيف حالك", "السلام عليكم"]
             }
         }
-        
+
         # Predefined responses
         self.responses = {
             "symptom_inquiry": {
@@ -99,19 +98,19 @@ class MultilingualMedicalChatbot:
                 "ar": "أنا هنا للمساعدة في الاستفسارات الطبية. يرجى سؤالي عن الأعراض أو الأدوية أو رفع الصور الطبية للتحليل."
             }
         }
-    
+
     def detect_language(self, text):
         """Simple language detection"""
         arabic_chars = re.findall(r'[\u0600-\u06FF]', text)
         if len(arabic_chars) > len(text) * 0.3:
             return 'ar'
         return 'en'
-    
+
     def classify_intent(self, text):
         """Classify user intent using keyword matching and mBERT"""
         text_lower = text.lower()
         language = self.detect_language(text)
-        
+
         # Score each intent based on keyword matching
         intent_scores = {}
         for intent, keywords in self.intents.items():
@@ -121,21 +120,21 @@ class MultilingualMedicalChatbot:
                 if keyword in text_lower:
                     score += 1
             intent_scores[intent] = score
-        
+
         # Get the intent with highest score
         if max(intent_scores.values()) > 0:
             predicted_intent = max(intent_scores, key=intent_scores.get)
         else:
             predicted_intent = "default"
-            
+
         return predicted_intent, language
-    
+
     def analyze_medical_image(self, image):
         """Analyze medical image (simplified version)"""
         try:
             # Convert PIL image to array for basic analysis
             img_array = np.array(image)
-            
+
             # Basic image statistics
             analysis = {
                 "width": image.width,
@@ -144,23 +143,23 @@ class MultilingualMedicalChatbot:
                 "mean_intensity": np.mean(img_array) if len(img_array.shape) <= 3 else 0,
                 "std_intensity": np.std(img_array) if len(img_array.shape) <= 3 else 0
             }
-            
+
             # Simple observations based on image properties
             observations = []
-            
+
             if analysis["mean_intensity"] < 50:
                 observations.append("Image appears to be quite dark - may be an X-ray or CT scan")
             elif analysis["mean_intensity"] > 200:
                 observations.append("Image appears bright - possibly overexposed or processed")
-            
+
             if image.mode == "L":
                 observations.append("Grayscale medical image detected")
-            
+
             return analysis, observations
-            
+
         except Exception as e:
             return None, [f"Error analyzing image: {str(e)}"]
-    
+
     def generate_response(self, intent, language, image_analysis=None):
         """Generate response based on intent and language"""
         if image_analysis and intent == "image_analysis":
@@ -177,7 +176,7 @@ class MultilingualMedicalChatbot:
                 response += "⚠️ This analysis is for informational purposes only. Consult a medical professional for accurate diagnosis."
         else:
             response = self.responses.get(intent, self.responses["default"])[language]
-        
+
         return response
 
 def main():
@@ -186,81 +185,81 @@ def main():
         page_icon="🏥",
         layout="wide"
     )
-    
+
     st.title("🏥 Multilingual Medical Chatbot")
     st.markdown("### مساعد طبي ذكي متعدد اللغات | Intelligent Multilingual Medical Assistant")
-    
+
     # Initialize chatbot
     if 'chatbot' not in st.session_state:
         with st.spinner("Loading mBERT model..."):
             st.session_state.chatbot = MultilingualMedicalChatbot()
-    
+
     # Initialize chat history
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
-    
+
     # Sidebar for features
     with st.sidebar:
         st.header("Features | الميزات")
         st.markdown("""
         ✅ **mBERT** for multilingual understanding
-        
+
         ✅ **Arabic & English** support
-        
+
         ✅ **Medical Image Analysis**
-        
+
         ✅ **Intent Classification**
-        
+
         ✅ **Symptom Inquiry**
-        
+
         ✅ **Medication Information**
         """)
-        
+
         st.header("Upload Medical Image")
         uploaded_file = st.file_uploader("Choose a medical image...", type=['png', 'jpg', 'jpeg', 'bmp'])
-    
+
     # Main chat interface
     col1, col2 = st.columns([2, 1])
-    
+
     with col1:
         st.header("Chat Interface")
-        
+
         # Display chat history
         for i, (user_msg, bot_response, timestamp) in enumerate(st.session_state.chat_history):
             st.markdown(f"**You ({timestamp}):** {user_msg}")
             st.markdown(f"**Bot:** {bot_response}")
             st.markdown("---")
-        
+
         # Text input
         user_input = st.text_input("Enter your message (English/Arabic) | أدخل رسالتك:", key="user_input")
-        
+
         col_send, col_clear = st.columns([1, 1])
         with col_send:
             if st.button("Send | إرسال"):
                 if user_input:
                     process_message(user_input, uploaded_file)
-        
+
         with col_clear:
             if st.button("Clear Chat | مسح المحادثة"):
                 st.session_state.chat_history = []
-                st.experimental_rerun()
-    
+                st.rerun()
+
     with col2:
         st.header("Model Information")
         st.markdown("""
         **Model:** mBERT (Multilingual BERT)
-        
+
         **Languages:** Arabic, English
-        
+
         **Capabilities:**
         - Intent Classification
         - Multilingual Understanding
         - Medical Image Analysis
         - Symptom Assessment
-        
+
         **Device:** CPU/GPU Auto-detection
         """)
-        
+
         if uploaded_file:
             st.header("Uploaded Image")
             image = Image.open(uploaded_file)
@@ -269,25 +268,25 @@ def main():
 def process_message(user_input, uploaded_file=None):
     """Process user message and generate response"""
     chatbot = st.session_state.chatbot
-    
+
     # Classify intent and detect language
     intent, language = chatbot.classify_intent(user_input)
-    
+
     # Analyze image if provided
     image_analysis = None
     if uploaded_file and intent == "image_analysis":
         image = Image.open(uploaded_file)
         image_analysis = chatbot.analyze_medical_image(image)
-    
+
     # Generate response
     response = chatbot.generate_response(intent, language, image_analysis)
-    
+
     # Add to chat history
     timestamp = datetime.now().strftime("%H:%M")
     st.session_state.chat_history.append((user_input, response, timestamp))
-    
+
     # Clear input and rerun
-    st.experimental_rerun()
+    st.rerun()
 
 if __name__ == "__main__":
     main()
