@@ -31,5 +31,5 @@ task = "shell.exec"
 args = "streamlit run main.py --server.address=0.0.0.0 --server.port=5000 --server.headless=true --server.enableCORS=false --server.enableWebsocketCompression=false"
 
 [[ports]]
-localPort = 5000
+localPort = 80
 externalPort = 80
