@@ -180,19 +180,30 @@ class MultilingualMedicalChatbot:
         return response
 
 def main():
-    st.set_page_config(
-        page_title="Multilingual Medical Chatbot",
-        page_icon="🏥",
-        layout="wide"
-    )
+    try:
+        st.set_page_config(
+            page_title="Multilingual Medical Chatbot",
+            page_icon="🏥",
+            layout="wide",
+            initial_sidebar_state="expanded"
+        )
+    except Exception as e:
+        st.error(f"Configuration error: {str(e)}")
 
     st.title("🏥 Multilingual Medical Chatbot")
     st.markdown("### مساعد طبي ذكي متعدد اللغات | Intelligent Multilingual Medical Assistant")
 
+    # Debug information
+    st.write("🔧 Debug: Streamlit is running correctly")
+    
     # Initialize chatbot
     if 'chatbot' not in st.session_state:
         with st.spinner("Loading mBERT model..."):
-            st.session_state.chatbot = MultilingualMedicalChatbot()
+            try:
+                st.session_state.chatbot = MultilingualMedicalChatbot()
+            except Exception as e:
+                st.error(f"Model loading error: {str(e)}")
+                st.info("The app is still functional with basic features")
 
     # Initialize chat history
     if 'chat_history' not in st.session_state:

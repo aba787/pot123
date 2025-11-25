@@ -8,6 +8,10 @@ enableCORS = false
 enableXsrfProtection = false
 port = 5000
 address = "0.0.0.0"
+baseUrlPath = ""
+enableStaticServing = true
 
 [browser]
 gatherUsageStats = false
+serverAddress = "0.0.0.0"
+serverPort = 5000
