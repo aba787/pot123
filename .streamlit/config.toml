@@ -6,12 +6,12 @@ developmentMode = false
 headless = true
 enableCORS = false
 enableXsrfProtection = false
-port = 5000
+port = 8080
 address = "0.0.0.0"
 baseUrlPath = ""
-enableStaticServing = true
+enableStaticServing = false
 
 [browser]
 gatherUsageStats = false
 serverAddress = "0.0.0.0"
-serverPort = 5000
+serverPort = 8080
