@@ -74,8 +74,8 @@ class MultilingualMedicalChatbot:
                 "ar": "أفهم أنك تعاني من أعراض. هل يمكنك وصفها بتفصيل أكثر؟ متى بدأت؟"
             },
             "medication_info": {
-                "en": "For medication information, please consult with a healthcare professional. I can provide general information only.",
-                "ar": "للحصول على معلومات الأدوية، يرجى استشارة أخصائي الرعاية الصحية. يمكنني تقديم معلومات عامة فقط."
+                "en": "For headache relief, common over-the-counter options include: Paracetamol (500-1000mg every 4-6 hours), Ibuprofen (200-400mg every 6-8 hours). However, please consult a pharmacist or doctor for personalized advice. If headaches persist, see a healthcare professional.",
+                "ar": "لتخفيف الصداع، الخيارات المتاحة بدون وصفة تشمل: الباراسيتامول (500-1000 مجم كل 4-6 ساعات)، الإيبوبروفين (200-400 مجم كل 6-8 ساعات). لكن يرجى استشارة الصيدلي أو الطبيب للنصيحة الشخصية. إذا استمر الصداع، راجع أخصائي الرعاية الصحية."
             },
             "appointment": {
                 "en": "To schedule an appointment, please contact the clinic directly or use the online booking system.",
@@ -111,15 +111,26 @@ class MultilingualMedicalChatbot:
         text_lower = text.lower()
         language = self.detect_language(text)
 
-        # Score each intent based on keyword matching
+        # Score each intent based on keyword matching with priority system
         intent_scores = {}
+        
+        # Check for medication keywords first (higher priority)
+        medication_keywords = self.intents["medication_info"][language]
+        medication_score = sum(1 for keyword in medication_keywords if keyword in text_lower)
+        
+        # If medication keywords found, boost medication intent
+        if medication_score > 0:
+            intent_scores["medication_info"] = medication_score * 2  # Higher weight
+        
+        # Score other intents normally
         for intent, keywords in self.intents.items():
-            score = 0
-            lang_keywords = keywords.get(language, [])
-            for keyword in lang_keywords:
-                if keyword in text_lower:
-                    score += 1
-            intent_scores[intent] = score
+            if intent != "medication_info":  # Skip medication as we handled it above
+                score = 0
+                lang_keywords = keywords.get(language, [])
+                for keyword in lang_keywords:
+                    if keyword in text_lower:
+                        score += 1
+                intent_scores[intent] = score
 
         # Get the intent with highest score
         if max(intent_scores.values()) > 0:
