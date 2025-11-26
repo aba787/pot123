@@ -333,15 +333,19 @@ class AdvancedMedicalChatbot:
         return False
 
     def process_drug_inquiry(self, query: str, language: str) -> str:
-        """معالجة استفسار عن دواء معين"""
-        # استخراج اسم الدواء من الاستفسار
-        drug_name = self.extract_drug_name(query)
+        """معالجة استفسار المستخدم - أعراض أو أدوية"""
+        # تحديد نية المستخدم أولاً
+        intent = self.detect_user_intent(query, language)
         
-        if not drug_name:
-            if language == 'ar':
-                return "لم أتمكن من تحديد اسم الدواء. يرجى ذكر اسم الدواء بوضوح."
-            else:
-                return "I couldn't identify the drug name. Please mention the drug name clearly."
+        if intent == 'symptom_inquiry':
+            return self.handle_symptom_inquiry(query, language)
+        elif intent == 'greeting':
+            return self.handle_greeting(query, language)
+        elif intent == 'drug_inquiry':
+            return self.handle_drug_inquiry(query, language)
+        else:
+            # في حالة عدم التأكد من النية
+            return self.handle_general_inquiry(query, language)
         
         # البحث عن معلومات الدواء
         drug_info = self.drug_api.search_drug(drug_name, language)
@@ -417,6 +421,269 @@ class AdvancedMedicalChatbot:
                 return drug
         
         return ""
+
+    def detect_user_intent(self, query: str, language: str) -> str:
+        """تحديد نية المستخدم من النص"""
+        query_lower = query.lower()
+        
+        # كلمات التحية
+        greeting_keywords = {
+            'ar': ['هلا', 'مرحبا', 'السلام عليكم', 'أهلا', 'كيفك', 'صباح الخير'],
+            'en': ['hello', 'hi', 'hey', 'good morning', 'good evening', 'greetings']
+        }
+        
+        # كلمات الأعراض
+        symptom_keywords = {
+            'ar': ['صداع', 'ألم', 'وجع', 'حرارة', 'حمى', 'كحة', 'سعال', 'اسعال', 'سعل', 
+                   'دوخة', 'غثيان', 'قيء', 'إسهال', 'إمساك', 'تعب', 'إرهاق', 'ضيق نفس',
+                   'مغص', 'التهاب', 'طفح', 'حكة', 'تورم', 'انتفاخ', 'خفقان', 'أعاني من'],
+            'en': ['headache', 'pain', 'fever', 'cough', 'dizziness', 'nausea', 'vomiting',
+                   'diarrhea', 'constipation', 'tired', 'fatigue', 'shortness of breath',
+                   'inflammation', 'rash', 'swelling', 'palpitations', 'i have', 'i feel']
+        }
+        
+        # كلمات الأدوية
+        drug_keywords = {
+            'ar': ['دواء', 'علاج', 'حبوب', 'كبسولة', 'شراب', 'جرعة', 'مرهم', 'قطرة'],
+            'en': ['medicine', 'medication', 'drug', 'pill', 'tablet', 'capsule', 'syrup', 'dose']
+        }
+        
+        # فحص التحية
+        if any(word in query_lower for word in greeting_keywords.get(language, [])):
+            return 'greeting'
+        
+        # فحص الأعراض
+        if any(word in query_lower for word in symptom_keywords.get(language, [])):
+            return 'symptom_inquiry'
+        
+        # فحص الأدوية
+        if any(word in query_lower for word in drug_keywords.get(language, [])):
+            return 'drug_inquiry'
+        
+        # البحث عن أسماء أدوية محددة
+        if self.extract_drug_name(query):
+            return 'drug_inquiry'
+        
+        return 'general_inquiry'
+
+    def handle_greeting(self, query: str, language: str) -> str:
+        """معالجة التحيات"""
+        if language == 'ar':
+            return """مرحباً بك! 👋 أنا البوت الطبي التوعوي.
+
+يمكنني مساعدتك في:
+🔸 معلومات عن الأدوية (مثل: معلومات عن الباراسيتامول)
+🔸 الأعراض الصحية (مثل: أعاني من صداع)
+🔸 قراءة الوصفات الطبية
+🔸 التحذير من تداخل الأدوية
+
+كيف يمكنني مساعدتك اليوم؟"""
+        else:
+            return """Hello! 👋 I'm your Medical Educational Bot.
+
+I can help you with:
+🔸 Medication information (e.g., information about paracetamol)
+🔸 Health symptoms (e.g., I have a headache)
+🔸 Reading medical prescriptions
+🔸 Drug interaction warnings
+
+How can I help you today?"""
+
+    def handle_symptom_inquiry(self, query: str, language: str) -> str:
+        """معالجة استفسارات الأعراض"""
+        # تصنيف الحالة أولاً
+        user_data = st.session_state.get('user_data', {})
+        classification = self.case_classifier.classify_case(query, user_data, language)
+        
+        # إذا كانت حالة طارئة
+        if classification['action'] == 'stop_medical_response':
+            return classification[f'message_{language}']
+        
+        # إذا كانت تحتاج صيدلي
+        if classification['action'] == 'refer_to_pharmacist':
+            case_summary = PharmacistPanel.create_case_summary(
+                user_data, query, query, classification
+            )
+            st.session_state.pharmacist_cases = st.session_state.get('pharmacist_cases', [])
+            st.session_state.pharmacist_cases.append(case_summary)
+            return classification[f'message_{language}'] + f"\n\nرقم الحالة | Case ID: {case_summary['case_id']}"
+        
+        # للحالات البسيطة - تقديم معلومات عامة
+        if language == 'ar':
+            response = "**معلومات عامة عن الأعراض المذكورة:**\n\n"
+            
+            # تحليل الأعراض
+            symptoms_advice = self.analyze_symptoms(query, language)
+            response += symptoms_advice
+            
+            response += "\n\n📋 **نصائح إضافية:**\n"
+            response += "• تأكد من شرب كمية كافية من الماء\n"
+            response += "• احصل على راحة كافية\n"
+            response += "• إذا استمرت الأعراض أو ازدادت سوءاً، راجع الطبيب\n\n"
+            response += "⚠️ **تنبيه:** هذه معلومات توعوية عامة وليست بديلاً عن الاستشارة الطبية."
+        else:
+            response = "**General information about the mentioned symptoms:**\n\n"
+            
+            # تحليل الأعراض
+            symptoms_advice = self.analyze_symptoms(query, language)
+            response += symptoms_advice
+            
+            response += "\n\n📋 **Additional recommendations:**\n"
+            response += "• Make sure to drink enough water\n"
+            response += "• Get adequate rest\n"
+            response += "• If symptoms persist or worsen, consult a doctor\n\n"
+            response += "⚠️ **Note:** This is general educational information and not a substitute for medical consultation."
+        
+        return response
+
+    def analyze_symptoms(self, query: str, language: str) -> str:
+        """تحليل الأعراض وتقديم نصائح عامة"""
+        query_lower = query.lower()
+        advice = []
+        
+        if language == 'ar':
+            if any(word in query_lower for word in ['صداع', 'وجع راس']):
+                advice.append("🔸 للصداع: الراحة في مكان هادئ ومظلم، كمادات باردة على الجبهة")
+            
+            if any(word in query_lower for word in ['كحة', 'سعال', 'اسعال']):
+                advice.append("🔸 للسعال: شرب السوائل الدافئة، العسل والليمون، تجنب المهيجات")
+            
+            if any(word in query_lower for word in ['حرارة', 'حمى']):
+                advice.append("🔸 للحمى: شرب السوائل، الراحة، كمادات باردة، قياس درجة الحرارة بانتظام")
+            
+            if any(word in query_lower for word in ['مغص', 'ألم معدة']):
+                advice.append("🔸 لألم المعدة: تجنب الأطعمة الحارة، شرب النعناع، الراحة")
+            
+            if not advice:
+                advice.append("🔸 للأعراض العامة: الراحة وشرب السوائل مهم جداً")
+        
+        else:
+            if any(word in query_lower for word in ['headache', 'head pain']):
+                advice.append("🔸 For headache: Rest in quiet, dark place, cold compress on forehead")
+            
+            if any(word in query_lower for word in ['cough', 'coughing']):
+                advice.append("🔸 For cough: Drink warm fluids, honey and lemon, avoid irritants")
+            
+            if any(word in query_lower for word in ['fever', 'temperature']):
+                advice.append("🔸 For fever: Drink fluids, rest, cold compress, monitor temperature regularly")
+            
+            if any(word in query_lower for word in ['stomach', 'abdominal pain']):
+                advice.append("🔸 For stomach pain: Avoid spicy foods, drink mint tea, rest")
+            
+            if not advice:
+                advice.append("🔸 For general symptoms: Rest and hydration are very important")
+        
+        return "\n".join(advice)
+
+    def handle_drug_inquiry(self, query: str, language: str) -> str:
+        """معالجة استفسارات الأدوية"""
+        # استخراج اسم الدواء من الاستفسار
+        drug_name = self.extract_drug_name(query)
+        
+        if not drug_name:
+            if language == 'ar':
+                return """لم أتمكن من تحديد اسم الدواء المحدد. 
+
+**الأدوية المتوفرة في قاعدة البيانات:**
+• باراسيتامول (Paracetamol)
+• إيبوبروفين (Ibuprofen)  
+• وارفارين (Warfarin)
+
+يمكنك السؤال عن أي منها، مثل: "معلومات عن الباراسيتامول" """
+            else:
+                return """I couldn't identify the specific drug name.
+
+**Available drugs in database:**
+• Paracetamol
+• Ibuprofen
+• Warfarin
+
+You can ask about any of them, e.g., "information about paracetamol" """
+        
+        # باقي الكود كما هو لمعالجة الأدوية المحددة
+        return self.process_specific_drug(drug_name, query, language)
+
+    def handle_general_inquiry(self, query: str, language: str) -> str:
+        """معالجة الاستفسارات العامة"""
+        if language == 'ar':
+            return """لم أفهم طلبك بوضوح. يمكنني مساعدتك في:
+
+🔸 **الأعراض:** اكتب مثلاً "أعاني من صداع" أو "عندي كحة"
+🔸 **الأدوية:** اسأل عن دواء محدد مثل "معلومات عن الباراسيتامول"
+🔸 **الوصفات:** ارفع صورة الوصفة الطبية من الشريط الجانبي
+
+كيف يمكنني مساعدتك؟"""
+        else:
+            return """I didn't understand your request clearly. I can help you with:
+
+🔸 **Symptoms:** Write e.g., "I have a headache" or "I have a cough"
+🔸 **Medications:** Ask about a specific drug like "information about paracetamol"
+🔸 **Prescriptions:** Upload prescription image from the sidebar
+
+How can I help you?"""
+
+    def process_specific_drug(self, drug_name: str, query: str, language: str) -> str:
+        """معالجة دواء محدد - الكود الأصلي"""
+        # البحث عن معلومات الدواء
+        drug_info = self.drug_api.search_drug(drug_name, language)
+        
+        if not drug_info:
+            if language == 'ar':
+                return f"عذراً، لا توجد معلومات عن الدواء '{drug_name}' في قاعدة البيانات."
+            else:
+                return f"Sorry, no information found for drug '{drug_name}' in the database."
+        
+        # تصنيف الحالة
+        user_data = st.session_state.get('user_data', {})
+        classification = self.case_classifier.classify_case(query, user_data, language)
+        
+        # إذا كانت حالة طارئة
+        if classification['action'] == 'stop_medical_response':
+            return classification[f'message_{language}']
+        
+        # فحص التداخلات الخطيرة
+        current_medications = user_data.get('current_medications', '').split(',')
+        has_interactions, interactions = self.drug_api.check_dangerous_interactions(
+            current_medications, drug_name
+        )
+        
+        # إذا كانت تحتاج صيدلي أو يوجد تداخلات خطيرة
+        if classification['action'] == 'refer_to_pharmacist' or (has_interactions and drug_info.get('danger_level') == 'high'):
+            # إنشاء ملخص للصيدلي
+            case_summary = PharmacistPanel.create_case_summary(
+                user_data, user_data.get('symptoms', ''), query, classification
+            )
+            st.session_state.pharmacist_cases = st.session_state.get('pharmacist_cases', [])
+            st.session_state.pharmacist_cases.append(case_summary)
+            
+            warning_msg = ""
+            if has_interactions:
+                if language == 'ar':
+                    warning_msg = f"⚠️ تحذير: يوجد تداخل دوائي محتمل مع: {', '.join(interactions)}\n"
+                else:
+                    warning_msg = f"⚠️ Warning: Potential drug interaction with: {', '.join(interactions)}\n"
+            
+            return warning_msg + classification[f'message_{language}'] + f"\n\nرقم الحالة | Case ID: {case_summary['case_id']}"
+        
+        # إعطاء معلومات عامة فقط للحالات البسيطة
+        if language == 'ar':
+            response = f"**معلومات عن {drug_info['name_ar']}:**\n\n"
+            response += f"🔹 **الاستخدام العام:** {drug_info['general_use_ar']}\n"
+            response += f"🔹 **التراكيز المتوفرة:** {', '.join(drug_info['concentrations'])}\n"
+            response += f"🔹 **التداخلات الدوائية:** {', '.join(drug_info['interactions_ar'])}\n"
+            response += f"🔹 **التحذيرات الأساسية:** {', '.join(drug_info['warnings_ar'])}\n"
+            response += f"🔹 **البدائل المتاحة:** {', '.join(drug_info['alternatives_ar'])}\n\n"
+            response += "⚠️ **تنبيه:** هذه معلومات عامة فقط. استشر الصيدلي للجرعات والاستخدام المناسب."
+        else:
+            response = f"**Information about {drug_info['name_en']}:**\n\n"
+            response += f"🔹 **General Use:** {drug_info['general_use_en']}\n"
+            response += f"🔹 **Available Concentrations:** {', '.join(drug_info['concentrations'])}\n"
+            response += f"🔹 **Drug Interactions:** {', '.join(drug_info['interactions_en'])}\n"
+            response += f"🔹 **Basic Warnings:** {', '.join(drug_info['warnings_en'])}\n"
+            response += f"🔹 **Alternatives:** {', '.join(drug_info['alternatives_en'])}\n\n"
+            response += "⚠️ **Note:** This is general information only. Consult a pharmacist for appropriate dosage and usage."
+        
+        return response
 
     def detect_language(self, text):
         """كشف لغة النص"""
