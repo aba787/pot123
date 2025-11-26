@@ -176,7 +176,7 @@ class CaseClassifier:
 
 class PrescriptionOCR:
     def __init__(self):
-        self.reader = easyocr.EasyOCR(['ar', 'en'])
+        self.reader = easyocr.Reader(['ar', 'en'])
         
     def extract_drug_info(self, image) -> Dict:
         """استخراج اسم الدواء والتركيز من الوصفة الطبية"""
@@ -439,6 +439,13 @@ def main():
     st.title("💊 البوت الطبي التوعوي المتقدم")
     st.markdown("### Advanced Educational Medical Bot | بوت طبي توعوي متقدم مع API الأدوية")
 
+    # تهيئة المحادثة المستمرة
+    if 'chat_history' not in st.session_state:
+        st.session_state.chat_history = []
+    
+    if 'user_data' not in st.session_state:
+        st.session_state.user_data = {}
+
     # تهيئة البوت
     if 'chatbot' not in st.session_state:
         with st.spinner("جاري تحميل النظام..."):
@@ -446,13 +453,7 @@ def main():
                 st.session_state.chatbot = AdvancedMedicalChatbot()
             except Exception as e:
                 st.error(f"خطأ في تحميل النظام: {str(e)}")
-
-    # تهيئة المحادثة المستمرة
-    if 'chat_history' not in st.session_state:
-        st.session_state.chat_history = []
-    
-    if 'user_data' not in st.session_state:
-        st.session_state.user_data = {}
+                st.stop()
 
     # الشريط الجانبي
     with st.sidebar:
