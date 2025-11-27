@@ -13,3 +13,4 @@ transformers
 easyocr
 opencv-python
 easyocr
+python-Levenshtein
