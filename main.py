@@ -569,7 +569,7 @@ class AdvancedMedicalChatbot:
 • دوخة؟
 • مغص؟
 
-اكتب المشكلة بوضوح مثل: "عندي صداع" أو "كحة من يومين""""
+اكتب المشكلة بوضوح مثل: "عندي صداع" أو "كحة من يومين" """
         else:
             return """Clarify the symptom more so I can understand:
 
