@@ -453,7 +453,15 @@ class IntentClassifier:
             },
             'GET_INTERACTION': {
                 'ar': ['تداخل', 'تفاعل', 'مع بعض', 'آمان', 'يتعارض', 'ينفع مع'],
-                'en': ['interaction', 'together', 'with', 'safe', 'conflict', 'mix', 'combine']
+                'en': ['interaction', 'interactions', 'together', 'with', 'safe', 'conflict', 'mix', 'combine']
+            },
+            'GET_SIDE_EFFECTS': {
+                'ar': ['أعراض جانبية', 'آثار جانبية', 'مضاعفات', 'أضرار'],
+                'en': ['side effects', 'side effect', 'adverse effects', 'reactions', 'complications']
+            },
+            'GET_WARNINGS': {
+                'ar': ['تحذيرات', 'تحذير', 'خطورة', 'احتياطات', 'انتبه'],
+                'en': ['warnings', 'warning', 'precautions', 'cautions', 'contraindications']
             }
         }
 
@@ -517,17 +525,27 @@ class IntentClassifier:
         words = user_input.lower().split()
         detected_drugs = []
         
-        # فحص الكلمات منفردة
+        # قائمة الكلمات المفتاحية للتجاهل
+        ignore_words = [
+            'interactions', 'interaction', 'side', 'effects', 'warnings', 
+            'alternatives', 'dosage', 'dose', 'تداخل', 'تفاعل', 
+            'أعراض', 'جانبية', 'تحذيرات', 'بدائل', 'جرعة'
+        ]
+        
+        # فحص الكلمات منفردة (مع تجاهل الكلمات المفتاحية)
         for word in words:
-            if len(word) > 3:  # تجنب الكلمات القصيرة
+            if len(word) > 3 and word not in ignore_words:
                 matched_drug, score = self.fuzzy_match_drug(word)
                 if score > 0.6:  # نسبة تشابه متوسطة
                     detected_drugs.append(matched_drug)
         
-        # فحص العبارة كاملة
-        full_input = user_input.lower().strip()
-        if len(full_input) > 3:
-            matched_drug, score = self.fuzzy_match_drug(full_input)
+        # فحص العبارة كاملة (بعد إزالة الكلمات المفتاحية)
+        cleaned_input = user_input.lower()
+        for ignore_word in ignore_words:
+            cleaned_input = cleaned_input.replace(ignore_word, '').strip()
+        
+        if len(cleaned_input) > 3:
+            matched_drug, score = self.fuzzy_match_drug(cleaned_input)
             if score > 0.6:
                 detected_drugs.append(matched_drug)
         
@@ -543,7 +561,7 @@ class IntentClassifier:
         all_detected_drugs = list(set(detected_drugs + fuzzy_drugs))
         
         if all_detected_drugs:
-            # فحص Intent patterns للأدوية
+            # فحص Intent patterns للأدوية مع أولوية للأوامر المحددة
             for intent, patterns in self.intent_patterns.items():
                 lang_patterns = patterns.get(language, [])
                 for pattern in lang_patterns:
@@ -554,6 +572,10 @@ class IntentClassifier:
                             return 'GET_ALTERNATIVES'
                         elif intent == 'GET_INTERACTION':
                             return 'GET_INTERACTION'
+                        elif intent == 'GET_SIDE_EFFECTS':
+                            return 'GET_SIDE_EFFECTS'
+                        elif intent == 'GET_WARNINGS':
+                            return 'GET_WARNINGS'
             
             # إذا كان فيه دوائين أو أكثر = تداخل
             if len(all_detected_drugs) >= 2:
@@ -632,6 +654,29 @@ class IntentClassifier:
 
             if len(detected_drugs) >= 2:
                 return {'classification': 'InteractionCheck', 'drugs': detected_drugs}
+            elif len(detected_drugs) == 1:
+                # إذا كان فيه دواء واحد مع كلمة interactions
+                return {'classification': 'InteractionInfo', 'drugs': detected_drugs}
+            else:
+                return {'classification': 'UnknownDrug', 'original_input': user_input}
+
+        elif intent == 'GET_SIDE_EFFECTS':
+            detected_drugs = self.symptom_parser.extract_drug_names(user_input)
+            if not detected_drugs:
+                detected_drugs = self._extract_drugs_with_fuzzy(user_input)
+
+            if detected_drugs:
+                return {'classification': 'SideEffectsRequest', 'drugs': detected_drugs}
+            else:
+                return {'classification': 'UnknownDrug', 'original_input': user_input}
+
+        elif intent == 'GET_WARNINGS':
+            detected_drugs = self.symptom_parser.extract_drug_names(user_input)
+            if not detected_drugs:
+                detected_drugs = self._extract_drugs_with_fuzzy(user_input)
+
+            if detected_drugs:
+                return {'classification': 'WarningsRequest', 'drugs': detected_drugs}
             else:
                 return {'classification': 'UnknownDrug', 'original_input': user_input}
 
@@ -696,6 +741,15 @@ class AdvancedMedicalChatbot:
 
         elif classification_result['classification'] == 'InteractionCheck':
             return self.handle_interaction_check(classification_result['drugs'], language)
+
+        elif classification_result['classification'] == 'InteractionInfo':
+            return self.handle_interaction_info(classification_result['drugs'], language)
+
+        elif classification_result['classification'] == 'SideEffectsRequest':
+            return self.handle_side_effects_request(classification_result['drugs'], language)
+
+        elif classification_result['classification'] == 'WarningsRequest':
+            return self.handle_warnings_request(classification_result['drugs'], language)
 
         elif classification_result['classification'] == 'UnknownDrug':
             return self.handle_unknown_drug(classification_result['original_input'], language)
@@ -836,6 +890,99 @@ class AdvancedMedicalChatbot:
 
 **💡 Note:** Generally safe to take together
 **👨‍⚕️ But consult pharmacist for proper timing**"""
+
+    def handle_interaction_info(self, detected_drugs: List[str], language: str) -> str:
+        """معالجة معلومات التداخل لدواء واحد"""
+        drug_name = detected_drugs[0]
+        drug_info = self.drug_api.search_drug(drug_name)
+
+        if not drug_info:
+            return self.handle_unknown_drug(drug_name, language)
+
+        if language == 'ar':
+            interactions_list = '\n• '.join(drug_info['interactions_ar'])
+            return f"""⚠️ **تداخلات {drug_info['name_ar']}:**
+
+• {interactions_list}
+
+**💡 ملاحظة:** تجنب هذه المواد/الأدوية مع {drug_info['name_ar']}
+**👨‍⚕️ استشر الصيدلي قبل تناول أي دواء آخر**"""
+        else:
+            interactions_list = '\n• '.join(drug_info['interactions_en'])
+            return f"""⚠️ **{drug_info['name_en']} interactions:**
+
+• {interactions_list}
+
+**💡 Note:** Avoid these substances/drugs with {drug_info['name_en']}
+**👨‍⚕️ Consult pharmacist before taking any other medication**"""
+
+    def handle_side_effects_request(self, detected_drugs: List[str], language: str) -> str:
+        """معالجة طلبات الآثار الجانبية"""
+        drug_name = detected_drugs[0]
+        drug_info = self.drug_api.search_drug(drug_name)
+
+        if not drug_info:
+            return self.handle_unknown_drug(drug_name, language)
+
+        if language == 'ar':
+            return f"""⚠️ **الآثار الجانبية المحتملة لـ {drug_info['name_ar']}:**
+
+**الآثار الشائعة:**
+• غثيان خفيف
+• صداع طفيف
+• اضطراب معدة
+
+**⚠️ توقف عن استخدام الدواء واستشر طبيب إذا ظهرت:**
+• حساسية (طفح جلدي، تورم)
+• صعوبة تنفس
+• ألم شديد في المعدة
+
+**👨‍⚕️ استشر الصيدلي للآثار الجانبية المحددة لحالتك**"""
+        else:
+            return f"""⚠️ **Possible side effects of {drug_info['name_en']}:**
+
+**Common side effects:**
+• Mild nausea
+• Slight headache
+• Stomach upset
+
+**⚠️ Stop using and consult doctor if you experience:**
+• Allergic reaction (rash, swelling)
+• Breathing difficulties
+• Severe stomach pain
+
+**👨‍⚕️ Consult pharmacist for specific side effects for your condition**"""
+
+    def handle_warnings_request(self, detected_drugs: List[str], language: str) -> str:
+        """معالجة طلبات التحذيرات"""
+        drug_name = detected_drugs[0]
+        drug_info = self.drug_api.search_drug(drug_name)
+
+        if not drug_info:
+            return self.handle_unknown_drug(drug_name, language)
+
+        if language == 'ar':
+            warnings_list = '\n• '.join(drug_info['warnings_ar'])
+            return f"""⚠️ **تحذيرات مهمة لـ {drug_info['name_ar']}:**
+
+• {warnings_list}
+
+**🚫 لا تستخدم إذا:**
+• لديك حساسية من المكونات
+• تتناول أدوية متعارضة
+
+**👨‍⚕️ استشر طبيب أو صيدلي قبل الاستخدام**"""
+        else:
+            warnings_list = '\n• '.join(drug_info['warnings_en'])
+            return f"""⚠️ **Important warnings for {drug_info['name_en']}:**
+
+• {warnings_list}
+
+**🚫 Do not use if:**
+• You are allergic to the ingredients
+• You are taking conflicting medications
+
+**👨‍⚕️ Consult doctor or pharmacist before use**"""
 
     def handle_unknown_drug(self, drug_name: str, language: str) -> str:
         """معالجة الأدوية غير المعروفة مع اقتراحات"""
