@@ -530,6 +530,108 @@ class AdvancedMedicalChatbot:
         self.drug_api = DrugAPIHandler()
         self.case_classifier = CaseClassifier()
         self.user_data = {}
+        
+        # Mapping مباشر: عرض → دواء مقترح
+        self.symptom_to_medication = {
+            # الصداع
+            'صداع': {
+                'medication': 'باراسيتامول مثل Panadol أو Fevadol',
+                'advice': 'استرح في مكان هادئ واشرب ماء كافي',
+                'dose': '500mg كل 6 ساعات'
+            },
+            'رأس يعور': {
+                'medication': 'باراسيتامول مثل Panadol أو Fevadol', 
+                'advice': 'استرح في مكان هادئ واشرب ماء كافي',
+                'dose': '500mg كل 6 ساعات'
+            },
+            'وجع راس': {
+                'medication': 'باراسيتامول مثل Panadol أو Fevadol',
+                'advice': 'استرح في مكان هادئ واشرب ماء كافي', 
+                'dose': '500mg كل 6 ساعات'
+            },
+            
+            # الحرارة
+            'حرارة': {
+                'medication': 'باراسيتامول 500mg مثل Panadol',
+                'advice': 'اشرب سوائل كثيرة وخذ راحة',
+                'dose': '500mg كل 6 ساعات'
+            },
+            'حمى': {
+                'medication': 'باراسيتامول 500mg مثل Panadol',
+                'advice': 'اشرب سوائل كثيرة وخذ راحة',
+                'dose': '500mg كل 6 ساعات'
+            },
+            'سخونة': {
+                'medication': 'باراسيتامول 500mg مثل Panadol',
+                'advice': 'اشرب سوائل كثيرة وخذ راحة',
+                'dose': '500mg كل 6 ساعات'
+            },
+            
+            # السعال
+            'كحة': {
+                'medication': 'مهدئ كحة مثل Tussivan C أو Decol',
+                'advice': 'اشرب سوائل دافئة وتجنب المهيجات',
+                'dose': 'حسب التعليمات على العلبة'
+            },
+            'سعال': {
+                'medication': 'مهدئ كحة مثل Tussivan C أو Decol',
+                'advice': 'اشرب سوائل دافئة وتجنب المهيجات',
+                'dose': 'حسب التعليمات على العلبة'
+            },
+            
+            # البلغم
+            'بلغم': {
+                'medication': 'Mucosolvan أو مذيب للبلغم',
+                'advice': 'اشرب سوائل كثيرة لتسهيل خروج البلغم',
+                'dose': 'ملعقة صغيرة 3 مرات يومياً'
+            },
+            'مخاط': {
+                'medication': 'Mucosolvan أو مذيب للبلغم',
+                'advice': 'اشرب سوائل كثيرة لتسهيل خروج البلغم',
+                'dose': 'ملعقة صغيرة 3 مرات يومياً'
+            },
+            
+            # الاحتقان
+            'احتقان': {
+                'medication': 'مزيل احتقان مثل Sudafed',
+                'advice': 'استنشق بخار ماء دافئ',
+                'dose': 'حبة كل 12 ساعة'
+            },
+            'انف مسدود': {
+                'medication': 'مزيل احتقان مثل Sudafed',
+                'advice': 'استنشق بخار ماء دافئ',
+                'dose': 'حبة كل 12 ساعة'
+            },
+            
+            # الدوخة والغثيان
+            'دوخة': {
+                'medication': 'Dramamine',
+                'advice': 'اجلس وتجنب الحركة السريعة',
+                'dose': 'حبة عند الحاجة'
+            },
+            'غثيان': {
+                'medication': 'Dramamine',
+                'advice': 'اشرب سوائل صافية وتجنب الأطعمة الدهنية',
+                'dose': 'حبة عند الحاجة'
+            },
+            
+            # آلام المعدة
+            'آلام معدة': {
+                'medication': 'Gaviscon أو مضاد حموضة',
+                'advice': 'تجنب الأطعمة الحارة والدهنية',
+                'dose': 'ملعقتين كبيرتين بعد الأكل'
+            },
+            'ألم معدة': {
+                'medication': 'Gaviscon أو مضاد حموضة',
+                'advice': 'تجنب الأطعمة الحارة والدهنية',
+                'dose': 'ملعقتين كبيرتين بعد الأكل'
+            },
+            'مغص': {
+                'medication': 'Buscopan أو مضاد التقلصات',
+                'advice': 'ضع كمادة دافئة على البطن',
+                'dose': 'حبة عند الألم'
+            }
+        }
 
     def setup_models(self):
         """تهيئة نماذج mBERT"""
@@ -549,74 +651,76 @@ class AdvancedMedicalChatbot:
             st.error(f"خطأ في تحميل النماذج: {str(e)}")
 
     def detect_user_intent(self, query: str, language: str) -> str:
-        """نظام Intent Detection شامل وواضح"""
+        """نظام Intent Detection حقيقي يفهم الأعراض والأدوية"""
         query_lower = query.lower()
         normalized_text = self.case_classifier.symptom_parser.normalize_text(query)
+        
+        # Intent Detection بأولويات واضحة
         
         # 1. فحص الطوارئ أولاً
         emergency_words = self.case_classifier.symptom_parser.emergency_symptoms.get(language, [])
         if any(word in normalized_text for word in emergency_words):
             return 'emergency'
         
-        # 2. فحص استفسارات الأطفال
+        # 2. فحص الأعراض الطبية - الأولوية الثانية
+        symptom_keywords = {
+            'ar': [
+                'صداع', 'رأس يعور', 'راس يعور', 'وجع راس', 'ألم راس',
+                'حرارة', 'حمى', 'سخونة', 'محموم', 'عندي سخونة',
+                'كحة', 'سعال', 'أكح', 'يكح', 'كحه',
+                'بلغم', 'مخاط', 'بصاق أخضر', 'بصاق أصفر',
+                'احتقان', 'انف مسدود', 'انف مزكوم', 'لا أقدر أتنفس من انفي',
+                'دوخة', 'دوار', 'دايخ', 'رأس يدور',
+                'غثيان', 'يلوع', 'أبي أتقيأ', 'معدتي تلف',
+                'آلام معدة', 'ألم معدة', 'بطني يعورني', 'وجع بطن', 'مغص',
+                'إسهال', 'براز سائل', 'مغص ونزلة',
+                'إمساك', 'لا أقدر أتبرز', 'براز صعب',
+                'حساسية', 'طفح جلدي', 'حكة', 'جلد أحمر',
+                'التهاب حلق', 'حلق يعور', 'بلع صعب'
+            ],
+            'en': [
+                'headache', 'head pain', 'head hurts', 'migraine',
+                'fever', 'high temperature', 'hot', 'burning up',
+                'cough', 'coughing', 'dry cough', 'wet cough',
+                'phlegm', 'mucus', 'green sputum', 'yellow sputum',
+                'congestion', 'stuffy nose', 'blocked nose', 'runny nose',
+                'dizziness', 'dizzy', 'vertigo', 'spinning',
+                'nausea', 'feeling sick', 'want to vomit', 'queasy',
+                'stomach pain', 'stomach ache', 'belly pain', 'cramps',
+                'diarrhea', 'loose stool', 'runny stomach',
+                'constipation', 'cannot pass stool', 'hard stool',
+                'allergy', 'rash', 'itching', 'red skin',
+                'sore throat', 'throat pain', 'difficult swallowing'
+            ]
+        }
+        
+        has_symptom = any(symptom in normalized_text for symptom in symptom_keywords.get(language, []))
+        if has_symptom:
+            return 'symptom_detected'
+        
+        # 3. فحص أسماء الأدوية المحددة
+        detected_drugs = self.case_classifier.symptom_parser.extract_drug_names(query)
+        if detected_drugs:
+            return 'medication_inquiry'
+        
+        # 4. فحص استفسارات الأطفال
         child_indicators = {
-            'ar': ['ولدي', 'بنتي', 'طفلي', 'رضيعي', 'عمره', 'عمرها', 'شهر', 'سنة', 'طفل'],
-            'en': ['my child', 'my baby', 'my son', 'my daughter', 'months old', 'years old', 'child', 'baby']
+            'ar': ['ولدي', 'بنتي', 'طفلي', 'رضيعي', 'عمره', 'عمرها', 'طفل'],
+            'en': ['my child', 'my baby', 'my son', 'my daughter', 'child', 'baby']
         }
         if any(word in query_lower for word in child_indicators.get(language, [])):
             return 'child_inquiry'
         
-        # 3. فحص وجود أسماء أدوية محددة
-        detected_drugs = self.case_classifier.symptom_parser.extract_drug_names(query)
-        has_drug_names = len(detected_drugs) > 0
-        
-        # 4. فحص استفسارات البدائل
-        alternative_questions = {
-            'ar': ['بديل', 'بدل', 'ما لقيت', 'غير متوفر', 'نفس المفعول', 'مثل'],
-            'en': ['alternative', 'substitute', 'instead of', 'replacement', 'same effect', 'similar to']
+        # 5. فحص الأسئلة العامة
+        general_questions = {
+            'ar': ['معلومات عن', 'وش فايدة', 'كيف أستخدم', 'متى آخذ'],
+            'en': ['information about', 'what is', 'how to use', 'when to take']
         }
-        if any(phrase in query_lower for phrase in alternative_questions.get(language, [])):
-            return 'alternative_request'
+        if any(phrase in query_lower for phrase in general_questions.get(language, [])):
+            return 'general_info'
         
-        # 5. فحص استفسارات التداخل
-        interaction_questions = {
-            'ar': ['مع بعض', 'تداخل', 'آمن مع', 'يتعارض', 'أخذ مع', 'جمع بين'],
-            'en': ['together', 'with', 'interaction', 'safe with', 'combine', 'take with']
-        }
-        if any(phrase in query_lower for phrase in interaction_questions.get(language, [])):
-            return 'interaction_check'
-        
-        # 6. فحص استفسارات الجرعة
-        dose_questions = {
-            'ar': ['كم الجرعة', 'كيف آخذ', 'كم مرة', 'جرعة', 'كم حبة', 'كمية'],
-            'en': ['how much', 'dosage', 'how many', 'dose', 'how often', 'quantity']
-        }
-        if any(phrase in query_lower for phrase in dose_questions.get(language, [])):
-            return 'dose_inquiry'
-        
-        # 7. فحص وجود أعراض
-        all_symptoms = (self.case_classifier.symptom_parser.normal_symptoms.get(language, []) +
-                       self.case_classifier.symptom_parser.needs_info_symptoms.get(language, []))
-        has_symptoms = any(word in normalized_text for word in all_symptoms)
-        
-        # 8. فحص الأسئلة العامة عن الأدوية
-        drug_general_questions = {
-            'ar': ['دواء للصداع', 'دواء للحمى', 'دواء للسعال', 'علاج للزكام', 'وش فايدة', 'معلومات عن'],
-            'en': ['medicine for headache', 'medicine for fever', 'drug for', 'what is', 'information about']
-        }
-        has_drug_question = any(phrase in query_lower for phrase in drug_general_questions.get(language, []))
-        
-        # المنطق النهائي
-        if has_symptoms and not has_drug_names:
-            return 'symptom_only'
-        elif has_drug_names and not has_symptoms:
-            return 'drug_info'
-        elif has_symptoms and has_drug_names:
-            return 'mixed_symptom_drug'
-        elif has_drug_question:
-            return 'drug_general_question'
-        else:
-            return 'unclear'
+        # 6. الحالة الافتراضية
+        return 'unclear'
 
     def process_query(self, user_input: str, language: str) -> str:
         """معالجة الاستفسار مع نظام Intent Detection المحسن"""
@@ -628,21 +732,13 @@ class AdvancedMedicalChatbot:
         # التعامل مع كل Intent بشكل مخصص
         if intent == 'emergency':
             return self.handle_emergency(user_input, language)
+        elif intent == 'symptom_detected':
+            return self.handle_symptom_direct(user_input, language)
+        elif intent == 'medication_inquiry':
+            return self.handle_drug_inquiry(user_input, language)
         elif intent == 'child_inquiry':
             return self.handle_child_inquiry(user_input, user_data, language)
-        elif intent == 'symptom_only':
-            return self.handle_symptom_inquiry(user_input, user_data, language)
-        elif intent == 'drug_info':
-            return self.handle_drug_inquiry(user_input, language)
-        elif intent == 'alternative_request':
-            return self.handle_alternative_request(user_input, language)
-        elif intent == 'interaction_check':
-            return self.handle_interaction_check(user_input, user_data, language)
-        elif intent == 'dose_inquiry':
-            return self.handle_dose_inquiry(user_input, user_data, language)
-        elif intent == 'mixed_symptom_drug':
-            return self.handle_mixed_inquiry(user_input, user_data, language)
-        elif intent == 'drug_general_question':
+        elif intent == 'general_info':
             return self.handle_general_drug_question(user_input, language)
         else:
             return self.handle_unclear_query(user_input, language)
@@ -710,6 +806,56 @@ class AdvancedMedicalChatbot:
             response += "⚠️ Consult pharmacist for appropriate dose"
         
         return response
+
+    def handle_symptom_direct(self, user_input: str, language: str) -> str:
+        """معالجة الأعراض مع رد فوري ومباشر"""
+        normalized_text = self.case_classifier.symptom_parser.normalize_text(user_input)
+        
+        # البحث عن العرض في القاموس
+        detected_symptom = None
+        for symptom, info in self.symptom_to_medication.items():
+            if symptom in normalized_text:
+                detected_symptom = (symptom, info)
+                break
+        
+        if detected_symptom:
+            symptom, info = detected_symptom
+            if language == 'ar':
+                response = f"💊 **للتعامل مع {symptom}:**\n\n"
+                response += f"**الدواء المقترح:** {info['medication']}\n"
+                response += f"**الجرعة:** {info['dose']}\n"
+                response += f"**نصيحة إضافية:** {info['advice']}\n\n"
+                response += "⚠️ إذا لم تتحسن خلال 3 أيام، راجع الطبيب"
+            else:
+                response = f"💊 **For {symptom}:**\n\n"
+                response += f"**Suggested medication:** {info['medication']}\n"
+                response += f"**Dosage:** {info['dose']}\n"
+                response += f"**Additional advice:** {info['advice']}\n\n"
+                response += "⚠️ If no improvement within 3 days, see a doctor"
+            
+            return response
+        
+        # إذا لم يجد العرض المحدد، رد عام للأعراض
+        if language == 'ar':
+            return """💡 **أعراض عامة:**
+
+للأعراض البسيطة:
+• **صداع:** باراسيتامول (Panadol)
+• **حرارة:** باراسيتامول 500mg
+• **كحة:** مهدئ كحة (Tussivan C)
+• **احتقان:** مزيل احتقان (Sudafed)
+
+حدد العرض بوضوح أكثر للحصول على نصيحة مخصصة."""
+        else:
+            return """💡 **General symptoms:**
+
+For common symptoms:
+• **Headache:** Paracetamol (Panadol)
+• **Fever:** Paracetamol 500mg
+• **Cough:** Cough suppressant (Tussivan C)
+• **Congestion:** Decongestant (Sudafed)
+
+Specify the symptom more clearly for personalized advice."""
 
     def handle_mixed_inquiry(self, user_input: str, user_data: Dict, language: str) -> str:
         """معالجة الاستفسارات المختلطة مع الأولوية للأمان"""
@@ -1100,57 +1246,76 @@ Or ask about specific drugs like: Panadol, Profin, Adol"""
             }
 
     def handle_unclear_query(self, user_input: str, language: str) -> str:
-        """سؤال واحد واضح بدلاً من "لم أفهم" """
+        """رد مباشر بدلاً من "لم أفهم" مع أمثلة واضحة"""
         query_lower = user_input.lower()
-        normalized_text = self.case_classifier.symptom_parser.normalize_text(user_input)
         
-        # تخمين ذكي وسؤال محدد
+        # ردود مباشرة للحالات الشائعة
         if language == 'ar':
             # التحيات
             if any(word in query_lower for word in ['مرحبا', 'هلا', 'السلام']):
-                return "أهلاً! هل تسأل عن دواء معين أو عندك عرض معين؟"
+                return """أهلاً! يمكنني مساعدتك في:
+
+💊 **أدوية للأعراض:**
+• "عندي صداع" → باراسيتامول
+• "حرارتي عالية" → خافض حرارة
+• "كحة قوية" → مهدئ كحة
+
+🔍 **معلومات الأدوية:**
+• "معلومات عن بندول"
+• "جرعة الأسبرين"
+
+اكتب عرضك أو اسم الدواء مباشرة!"""
             
             # الشكر
             elif any(word in query_lower for word in ['شكراً', 'شكرا', 'يعطيك العافية']):
-                return "العفو! عندك سؤال ثاني؟"
+                return "العفو! أي سؤال ثاني؟"
             
-            # تخمين من كلمات مفتاحية
-            elif 'ألم' in normalized_text or 'يعور' in normalized_text:
-                return "هل تقصد ألم في مكان معين؟ مثلاً: راسي يعورني؟"
-            
-            elif 'حرارة' in normalized_text or 'سخونة' in normalized_text:
-                return "هل تقصد ارتفاع في الحرارة؟ وكم العمر؟"
-            
-            elif any(word in query_lower for word in ['دواء', 'علاج', 'حبوب']):
-                return "هل تسأل عن دواء معين؟ أو تبغى دواء لعرض معين؟"
-            
-            elif any(word in query_lower for word in ['طفل', 'ولد', 'بنت']):
-                return "هل تسأل عن طفل؟ كم العمر والوزن؟"
-            
+            # غير واضح
             else:
-                return "هل تسأل عن دواء معين أو عندك عرض تبغى له علاج؟"
+                return """اكتب عرضك مباشرة أو اسم الدواء:
+
+**أمثلة للأعراض:**
+• "صداع شديد"
+• "حرارة عالية" 
+• "كحة من يومين"
+
+**أمثلة للأدوية:**
+• "معلومات عن بندول"
+• "جرعة بروفين"
+
+ما تحتاج تفاصيل كثيرة، فقط اذكر المشكلة!"""
         
         else:  # English
             if any(word in query_lower for word in ['hello', 'hi', 'hey']):
-                return "Hello! Are you asking about a specific medicine or do you have symptoms?"
+                return """Hello! I can help you with:
+
+💊 **Medications for symptoms:**
+• "I have headache" → Paracetamol
+• "High fever" → Fever reducer
+• "Bad cough" → Cough suppressant
+
+🔍 **Drug information:**
+• "Information about Panadol"
+• "Aspirin dosage"
+
+Just write your symptom or drug name directly!"""
             
             elif any(word in query_lower for word in ['thank', 'thanks']):
                 return "You're welcome! Any other questions?"
             
-            elif 'pain' in query_lower:
-                return "Do you mean pain in a specific area? Like: I have a headache?"
-            
-            elif 'fever' in query_lower:
-                return "Do you mean high temperature? What's the age?"
-            
-            elif any(word in query_lower for word in ['medicine', 'drug', 'medication']):
-                return "Are you asking about a specific medicine or need medicine for symptoms?"
-            
-            elif any(word in query_lower for word in ['child', 'baby', 'kid']):
-                return "Are you asking about a child? What's the age and weight?"
-            
             else:
-                return "Are you asking about a specific medicine or do you have symptoms that need treatment?"
+                return """Write your symptom directly or drug name:
+
+**Symptom examples:**
+• "Severe headache"
+• "High fever"
+• "Cough for 2 days"
+
+**Drug examples:**
+• "Information about Panadol"
+• "Profin dosage"
+
+No need for details, just mention the problem!"""
 
     def create_pharmacist_referral(self, classification: Dict, user_input: str, user_data: Dict, language: str) -> str:
         """Task 8: إنشاء إحالة للصيدلي"""
