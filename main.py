@@ -1036,7 +1036,14 @@ def main():
                         st.markdown("---")
 
         # إدخال الرسالة الجديدة
+        # Check if there's a selected example to populate the text area
+        example_value = st.session_state.get('selected_example', '')
+        if example_value:
+            # Clear the selected example after using it
+            st.session_state.selected_example = ''
+        
         user_input = st.text_area("اكتب رسالتك (عربي/إنجليزي):", 
+                                 value=example_value,
                                  placeholder="مثال: راسي يعورني، أو معلومات عن بندول، أو دواء للحمى", 
                                  key="user_input_area")
 
@@ -1079,7 +1086,8 @@ def main():
         
         for example in examples:
             if st.button(f"جرب: {example}", key=f"example_{hash(example)}"):
-                st.session_state.user_input_area = example
+                # Store the example in session state for the next render
+                st.session_state.selected_example = example
                 st.rerun()
 
     # لوحة الصيدلي
