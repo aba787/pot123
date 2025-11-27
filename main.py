@@ -581,7 +581,7 @@ class AdvancedMedicalChatbot:
 • Dizziness?
 • Cramps?
 
-Write the problem clearly like: "I have headache" or "Cough for 2 days""""
+Write the problem clearly like: "I have headache" or "Cough for 2 days" """
 
     def detect_language(self, text: str) -> str:
         """كشف لغة النص"""
