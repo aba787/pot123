@@ -36,7 +36,7 @@ class DrugAPIHandler:
                 "min_age_months": 0
             },
             "ibuprofen": {
-                "name_ar": "إيبوبروفين", 
+                "name_ar": "إيبوبروفين",
                 "name_en": "Ibuprofen",
                 "concentrations": ["200mg", "400mg", "600mg", "100mg/5ml"],
                 "general_use_ar": "مسكن ومضاد للالتهاب",
@@ -106,7 +106,7 @@ class DrugAPIHandler:
         drug_name_clean = drug_name.lower().strip()
 
         for key, drug_info in self.mock_drug_database.items():
-            if (drug_name_clean in key.lower() or 
+            if (drug_name_clean in key.lower() or
                 drug_name_clean in drug_info.get('name_ar', '').lower() or
                 drug_name_clean in drug_info.get('name_en', '').lower()):
                 return drug_info
@@ -118,8 +118,8 @@ class MedicalSafetyChecker:
         # قائمة إجبارية بكلمات الأطفال
         self.child_keywords = {
             'ar': [
-                'طفل', 'طفلي', 'ولدي', 'بنتي', 'العمر', 'عمره', 'عمرها', 
-                'سنة', 'سنين', 'شهر', 'أشهر', 'وزنه', 'وزنها', 'رضيع', 
+                'طفل', 'طفلي', 'ولدي', 'بنتي', 'العمر', 'عمره', 'عمرها',
+                'سنة', 'سنين', 'شهر', 'أشهر', 'وزنه', 'وزنها', 'رضيع',
                 'مولود', 'مواليد', 'طفلة', 'صبي', 'بنية'
             ],
             'en': [
@@ -207,7 +207,7 @@ class AdvancedSymptomParser:
         self.slang_normalization = {
             # ألفاظ الألم العامة
             'يعورني': 'ألم',
-            'يوجعني': 'ألم', 
+            'يوجعني': 'ألم',
             'تعورني': 'ألم',
             'توجعني': 'ألم',
             'يألمني': 'ألم',
@@ -243,7 +243,7 @@ class AdvancedSymptomParser:
             # السعال والزكام
             'كحه': 'كحة',
             'كحة': 'كحة',
-            'يكح': 'كحة', 
+            'يكح': 'كحة',
             'اسعل': 'كحة',
             'اسعال': 'كحة',
             'أكح': 'كحة',
@@ -275,7 +275,7 @@ class AdvancedSymptomParser:
             'مكسر', 'مش طبيعي', 'غريب', 'مش عادي', 'حاسس بحاجة',
             'مضايقني', 'مقلقني', 'غير مرتاح'
         ]
-        
+
         # قاموس شامل لأسماء الأدوية التجارية
         self.drug_synonyms = {
             # باراسيتامول
@@ -420,34 +420,45 @@ class IntentClassifier:
         """Fuzzy matching للأدوية مع تهجئة خاطئة"""
         best_match = None
         best_score = 0
-        
+
         # البحث في قاعدة البيانات الأساسية
         for drug_key in self.drug_api.mock_drug_database.keys():
             score = SequenceMatcher(None, input_drug.lower(), drug_key.lower()).ratio()
             if score > best_score:
                 best_score = score
                 best_match = drug_key
-        
+
         # البحث في الأسماء التجارية
         for synonym, standard_name in self.symptom_parser.drug_synonyms.items():
             score = SequenceMatcher(None, input_drug.lower(), synonym.lower()).ratio()
             if score > best_score:
                 best_score = score
                 best_match = standard_name
-        
+
         return best_match, best_score
+
+    def _extract_drugs_with_fuzzy(self, user_input: str) -> List[str]:
+        """Helper function to extract drugs using fuzzy matching."""
+        words = user_input.lower().split()
+        detected_drugs = []
+        for word in words:
+            if len(word) > 3:  # تجنب الكلمات القصيرة
+                matched_drug, score = self.fuzzy_match_drug(word)
+                if score > 0.7:  # نسبة تشابه عالية
+                    detected_drugs.append(matched_drug)
+        return list(set(detected_drugs))
 
     def detect_intent(self, user_input: str, language: str) -> str:
         """كشف الـ Intent بدقة عالية"""
         user_input_lower = user_input.lower()
-        
+
         # فحص Intent patterns
         for intent, patterns in self.intent_patterns.items():
             lang_patterns = patterns.get(language, [])
             for pattern in lang_patterns:
                 if pattern in user_input_lower:
                     return intent
-        
+
         # فحص وجود أسماء أدوية
         detected_drugs = self.symptom_parser.extract_drug_names(user_input)
         if detected_drugs:
@@ -458,26 +469,23 @@ class IntentClassifier:
             if len(detected_drugs) >= 2:
                 return 'GET_INTERACTION'
             return 'GET_DRUG_INFO'
-        
+
         # محاولة fuzzy matching للأدوية
-        words = user_input_lower.split()
-        for word in words:
-            if len(word) > 3:  # تجنب الكلمات القصيرة
-                matched_drug, score = self.fuzzy_match_drug(word)
-                if score > 0.7:  # نسبة تشابه عالية
-                    return 'GET_DRUG_INFO'
-        
+        fuzzy_drugs = self._extract_drugs_with_fuzzy(user_input)
+        if fuzzy_drugs:
+            return 'GET_DRUG_INFO'
+
         # فحص الأعراض
         normalized_text = self.symptom_parser.normalize_text(user_input)
         for symptom in self.symptom_responses.keys():
             if symptom in normalized_text:
                 return 'GET_SYMPTOM_SUGGESTION'
-        
+
         return 'CLARIFY'
 
     def classify_input(self, user_input: str, language: str) -> Dict:
         """تصنيف محسّن للمدخلات"""
-        
+
         # Step 1: فحص السلامة
         safety_check = self.safety_checker.check_safety_violations(user_input, language)
         if safety_check['violation']:
@@ -490,45 +498,49 @@ class IntentClassifier:
 
         # Step 2: كشف Intent
         intent = self.detect_intent(user_input, language)
-        
+
         if intent == 'GET_DRUG_INFO':
             detected_drugs = self.symptom_parser.extract_drug_names(user_input)
             if not detected_drugs:
                 # محاولة fuzzy matching
-                words = user_input.lower().split()
-                for word in words:
-                    if len(word) > 3:
-                        matched_drug, score = self.fuzzy_match_drug(word)
-                        if score > 0.7:
-                            detected_drugs = [matched_drug]
-                            break
-            
+                detected_drugs = self._extract_drugs_with_fuzzy(user_input)
+
             if detected_drugs:
                 return {'classification': 'DrugInfo', 'drugs': detected_drugs}
             else:
                 return {'classification': 'UnknownDrug', 'original_input': user_input}
-        
+
         elif intent == 'GET_DOSAGE':
             detected_drugs = self.symptom_parser.extract_drug_names(user_input)
+            if not detected_drugs:
+                detected_drugs = self._extract_drugs_with_fuzzy(user_input)
+
             if detected_drugs:
                 return {'classification': 'DosageRequest', 'drugs': detected_drugs}
             else:
                 return {'classification': 'UnknownDrug', 'original_input': user_input}
-        
+
         elif intent == 'GET_ALTERNATIVES':
             detected_drugs = self.symptom_parser.extract_drug_names(user_input)
+            if not detected_drugs:
+                detected_drugs = self._extract_drugs_with_fuzzy(user_input)
+
             if detected_drugs:
                 return {'classification': 'AlternativesRequest', 'drugs': detected_drugs}
             else:
                 return {'classification': 'UnknownDrug', 'original_input': user_input}
-        
+
         elif intent == 'GET_INTERACTION':
             detected_drugs = self.symptom_parser.extract_drug_names(user_input)
+            if len(detected_drugs) < 2:
+                # محاولة استخراج دوائين من النص
+                detected_drugs = self._extract_drugs_with_fuzzy(user_input)
+
             if len(detected_drugs) >= 2:
                 return {'classification': 'InteractionCheck', 'drugs': detected_drugs}
             else:
                 return {'classification': 'UnknownDrug', 'original_input': user_input}
-        
+
         elif intent == 'GET_SYMPTOM_SUGGESTION':
             normalized_text = self.symptom_parser.normalize_text(user_input)
             for symptom, response_data in self.symptom_responses.items():
@@ -538,7 +550,7 @@ class IntentClassifier:
                         'symptom': symptom,
                         'response': response_data[f'response_{language}']
                     }
-        
+
         return {'classification': 'Clarify'}
 
 class AdvancedMedicalChatbot:
@@ -629,10 +641,10 @@ class AdvancedMedicalChatbot:
         """معالجة طلبات الجرعة - ممنوع إعطاء جرعة"""
         drug_name = detected_drugs[0]
         drug_info = self.drug_api.search_drug(drug_name)
-        
+
         if not drug_info:
             return self.handle_unknown_drug(drug_name, language)
-        
+
         if language == 'ar':
             return f"""🚫 **لا يمكنني إعطاء جرعة {drug_info['name_ar']}**
 
@@ -658,10 +670,10 @@ class AdvancedMedicalChatbot:
         """معالجة طلبات البدائل"""
         drug_name = detected_drugs[0]
         drug_info = self.drug_api.search_drug(drug_name)
-        
+
         if not drug_info:
             return self.handle_unknown_drug(drug_name, language)
-        
+
         if language == 'ar':
             alternatives_list = '\n• '.join(drug_info['alternatives_ar'])
             return f"""💊 **بدائل {drug_info['name_ar']}:**
@@ -686,17 +698,17 @@ class AdvancedMedicalChatbot:
                 return "أحتاج اسمين من الأدوية لفحص التداخل"
             else:
                 return "I need two drug names to check interactions"
-        
+
         drug1_name = detected_drugs[0]
         drug2_name = detected_drugs[1]
-        
+
         drug1_info = self.drug_api.search_drug(drug1_name)
         drug2_info = self.drug_api.search_drug(drug2_name)
-        
+
         if not drug1_info or not drug2_info:
             missing_drug = drug1_name if not drug1_info else drug2_name
             return self.handle_unknown_drug(missing_drug, language)
-        
+
         # فحص التداخل البسيط
         interaction_found = False
         if language == 'ar':
@@ -705,7 +717,7 @@ class AdvancedMedicalChatbot:
                 if interaction.lower() in drug2_info['name_ar'].lower() or interaction.lower() in drug2_name.lower():
                     interaction_found = True
                     break
-        
+
         if language == 'ar':
             if interaction_found:
                 return f"""⚠️ **تحذير: قد يوجد تداخل بين {drug1_info['name_ar']} و {drug2_info['name_ar']}**
@@ -735,15 +747,15 @@ class AdvancedMedicalChatbot:
         """معالجة الأدوية غير المعروفة مع اقتراحات"""
         # محاولة fuzzy matching
         best_match, score = self.intent_classifier.fuzzy_match_drug(drug_name)
-        
+
         if language == 'ar':
             response = f"🔍 **الدواء '{drug_name}' غير موجود في قاعدة البيانات**\n\n"
-            
+
             if best_match and score > 0.6:
                 matched_drug_info = self.drug_api.search_drug(best_match)
                 if matched_drug_info:
                     response += f"💡 **هل تقصد:** {matched_drug_info['name_ar']} ({matched_drug_info['name_en']})؟\n\n"
-            
+
             response += """**💭 اقتراحات:**
 • تأكد من الإملاء الصحيح
 • جرب الاسم التجاري مثل "بندول" بدل "باراسيتامول"
@@ -752,19 +764,19 @@ class AdvancedMedicalChatbot:
 **👨‍⚕️ أو استشر الصيدلي مباشرة**"""
         else:
             response = f"🔍 **Drug '{drug_name}' not found in database**\n\n"
-            
+
             if best_match and score > 0.6:
                 matched_drug_info = self.drug_api.search_drug(best_match)
                 if matched_drug_info:
                     response += f"💡 **Did you mean:** {matched_drug_info['name_en']} ({matched_drug_info['name_ar']})?\n\n"
-            
+
             response += """**💭 Suggestions:**
 • Check correct spelling
 • Try brand name like "Panadol" instead of "Paracetamol"
 • Write generic name if available
 
 **👨‍⚕️ Or consult pharmacist directly**"""
-        
+
         return response
 
     def handle_unclear_input(self, user_input: str, language: str) -> str:
@@ -774,7 +786,7 @@ class AdvancedMedicalChatbot:
 
 **حدد نوع المشكلة:**
 • حرارة؟
-• ألم؟ 
+• ألم؟
 • كحة؟
 • التهاب؟
 • دوخة؟
@@ -924,9 +936,9 @@ def main():
         if example_value:
             st.session_state.selected_example = ''
 
-        user_input = st.text_area("اكتب رسالتك (عربي/إنجليزي):", 
+        user_input = st.text_area("اكتب رسالتك (عربي/إنجليزي):",
                                  value=example_value,
-                                 placeholder="مثال: عندي صداع، أو معلومات عن بندول", 
+                                 placeholder="مثال: عندي صداع، أو معلومات عن بندول",
                                  key="user_input_area")
 
         col_send, col_clear = st.columns([1, 1])
@@ -944,7 +956,7 @@ def main():
     with col2:
         st.header("قواعد السلامة النشطة")
         st.success("✅ فحص كلمات الأطفال")
-        st.success("✅ فحص كلمات الحوامل") 
+        st.success("✅ فحص كلمات الحوامل")
         st.success("✅ فحص كلمات الطوارئ")
         st.success("✅ منع الجرعات نهائياً")
         st.success("✅ Decision Tree فعال")
@@ -953,7 +965,7 @@ def main():
         st.header("أمثلة للتجربة الجديدة")
         examples = [
             "جرعة Augmentin",
-            "بدائل Zanidip", 
+            "بدائل Zanidip",
             "تداخل Brufen مع Panadol",
             "معلومات عن banadool",
             "كحة ناشفة من يومين"
