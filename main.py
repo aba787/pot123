@@ -35,6 +35,54 @@ class DrugAPIHandler:
                 "pediatric_safe": False,  # NO PEDIATRIC DOSES ALLOWED
                 "min_age_months": 0
             },
+            "augmentin": {
+                "name_ar": "أوجمنتين",
+                "name_en": "Augmentin",
+                "concentrations": ["625mg", "1g", "228mg/5ml"],
+                "general_use_ar": "مضاد حيوي واسع المجال",
+                "general_use_en": "Broad spectrum antibiotic",
+                "interactions_ar": ["مضادات التجلط", "المكملات الحديدية"],
+                "interactions_en": ["Blood thinners", "Iron supplements"],
+                "warnings_ar": ["إكمال الكورس كاملاً", "حذار من الحساسية"],
+                "warnings_en": ["Complete full course", "Caution with allergies"],
+                "alternatives_ar": ["أموكسيل", "كلافوكس"],
+                "alternatives_en": ["Amoxil", "Clavox"],
+                "danger_level": "medium",
+                "pediatric_safe": False,
+                "min_age_months": 3
+            },
+            "zanidip": {
+                "name_ar": "زانيديب",
+                "name_en": "Zanidip",
+                "concentrations": ["10mg", "20mg"],
+                "general_use_ar": "علاج ضغط الدم المرتفع",
+                "general_use_en": "High blood pressure treatment",
+                "interactions_ar": ["جريب فروت", "أدوية القلب"],
+                "interactions_en": ["Grapefruit", "Heart medications"],
+                "warnings_ar": ["لا يوقف فجأة", "متابعة طبية ضرورية"],
+                "warnings_en": ["Don't stop suddenly", "Medical follow-up required"],
+                "alternatives_ar": ["أملور", "نورفاسك"],
+                "alternatives_en": ["Amlor", "Norvasc"],
+                "danger_level": "high",
+                "pediatric_safe": False,
+                "min_age_months": 216
+            },
+            "mucosolvan": {
+                "name_ar": "موكوسولفان",
+                "name_en": "Mucosolvan",
+                "concentrations": ["30mg", "15mg/5ml"],
+                "general_use_ar": "مذيب للبلغم ومهدئ للسعال",
+                "general_use_en": "Expectorant and cough suppressant",
+                "interactions_ar": ["قليلة التداخل"],
+                "interactions_en": ["Few interactions"],
+                "warnings_ar": ["اشرب سوائل كثيرة", "لا تستخدم أكثر من أسبوع"],
+                "warnings_en": ["Drink plenty of fluids", "Don't use more than a week"],
+                "alternatives_ar": ["بيسولفون", "أمبروكسول"],
+                "alternatives_en": ["Bisolvon", "Ambroxol"],
+                "danger_level": "low",
+                "pediatric_safe": False,
+                "min_age_months": 24
+            },
             "ibuprofen": {
                 "name_ar": "إيبوبروفين",
                 "name_en": "Ibuprofen",
@@ -295,6 +343,8 @@ class AdvancedSymptomParser:
             'tylenol': 'paracetamol',
             'novaldol': 'paracetamol',
             'acamol': 'paracetamol',
+            'باراسيتامول': 'paracetamol',
+            'paracetamol': 'paracetamol',
 
             # إيبوبروفين
             'بروفين': 'ibuprofen',
@@ -331,6 +381,31 @@ class AdvancedSymptomParser:
             'fluotab': 'paracetamol',
             'comtrex': 'paracetamol',
             'night_cold': 'paracetamol',
+
+            # أوجمنتين
+            'أوجمنتين': 'augmentin',
+            'اوجمنتين': 'augmentin',
+            'augmentin': 'augmentin',
+            'أوجمين': 'augmentin',
+            'اوجمين': 'augmentin',
+            'كلافوكس': 'augmentin',
+            'clavox': 'augmentin',
+
+            # زانيديب
+            'زانيديب': 'zanidip',
+            'zanidip': 'zanidip',
+            'أملور': 'zanidip',
+            'amlor': 'zanidip',
+            'نورفاسك': 'zanidip',
+            'norvasc': 'zanidip',
+
+            # موكوسولفان
+            'موكوسولفان': 'mucosolvan',
+            'mucosolvan': 'mucosolvan',
+            'بيسولفون': 'mucosolvan',
+            'bisolvon': 'mucosolvan',
+            'أمبروكسول': 'mucosolvan',
+            'ambroxol': 'mucosolvan',
 
             # أخرى
             'أسبرين': 'aspirin',
@@ -441,41 +516,60 @@ class IntentClassifier:
         """Helper function to extract drugs using fuzzy matching."""
         words = user_input.lower().split()
         detected_drugs = []
+        
+        # فحص الكلمات منفردة
         for word in words:
             if len(word) > 3:  # تجنب الكلمات القصيرة
                 matched_drug, score = self.fuzzy_match_drug(word)
-                if score > 0.7:  # نسبة تشابه عالية
+                if score > 0.6:  # نسبة تشابه متوسطة
                     detected_drugs.append(matched_drug)
+        
+        # فحص العبارة كاملة
+        full_input = user_input.lower().strip()
+        if len(full_input) > 3:
+            matched_drug, score = self.fuzzy_match_drug(full_input)
+            if score > 0.6:
+                detected_drugs.append(matched_drug)
+        
         return list(set(detected_drugs))
 
     def detect_intent(self, user_input: str, language: str) -> str:
-        """كشف الـ Intent بدقة عالية"""
+        """كشف الـ Intent بدقة عالية مع أولوية للأدوية"""
         user_input_lower = user_input.lower()
 
-        # فحص Intent patterns
+        # فحص الأدوية أولاً - أهم شي
+        detected_drugs = self.symptom_parser.extract_drug_names(user_input)
+        fuzzy_drugs = self._extract_drugs_with_fuzzy(user_input)
+        all_detected_drugs = list(set(detected_drugs + fuzzy_drugs))
+        
+        if all_detected_drugs:
+            # فحص Intent patterns للأدوية
+            for intent, patterns in self.intent_patterns.items():
+                lang_patterns = patterns.get(language, [])
+                for pattern in lang_patterns:
+                    if pattern in user_input_lower:
+                        if intent == 'GET_DOSAGE':
+                            return 'GET_DOSAGE'
+                        elif intent == 'GET_ALTERNATIVES':
+                            return 'GET_ALTERNATIVES'
+                        elif intent == 'GET_INTERACTION':
+                            return 'GET_INTERACTION'
+            
+            # إذا كان فيه دوائين أو أكثر = تداخل
+            if len(all_detected_drugs) >= 2:
+                return 'GET_INTERACTION'
+            
+            # أي دواء منفرد = معلومات الدواء
+            return 'GET_DRUG_INFO'
+
+        # فحص Intent patterns العامة (بدون أدوية)
         for intent, patterns in self.intent_patterns.items():
             lang_patterns = patterns.get(language, [])
             for pattern in lang_patterns:
                 if pattern in user_input_lower:
                     return intent
 
-        # فحص وجود أسماء أدوية
-        detected_drugs = self.symptom_parser.extract_drug_names(user_input)
-        if detected_drugs:
-            # إذا كان فيه دواء + كلمة أخرى تدل على معلومات
-            if any(word in user_input_lower for word in ['معلومات', 'عن', 'about', 'info']):
-                return 'GET_DRUG_INFO'
-            # إذا كان فيه دوائين
-            if len(detected_drugs) >= 2:
-                return 'GET_INTERACTION'
-            return 'GET_DRUG_INFO'
-
-        # محاولة fuzzy matching للأدوية
-        fuzzy_drugs = self._extract_drugs_with_fuzzy(user_input)
-        if fuzzy_drugs:
-            return 'GET_DRUG_INFO'
-
-        # فحص الأعراض
+        # فحص الأعراض فقط إذا ما لقينا أدوية
         normalized_text = self.symptom_parser.normalize_text(user_input)
         for symptom in self.symptom_responses.keys():
             if symptom in normalized_text:
