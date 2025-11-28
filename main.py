@@ -1,6 +1,6 @@
 import streamlit as st
 import torch
-from transformers import BertTokenizer, BertForSequenceClassification, pipeline
+from transformers import AutoTokenizer, BertForSequenceClassification, pipeline
 from PIL import Image
 import pandas as pd
 import numpy as np
@@ -701,7 +701,7 @@ class AdvancedMedicalChatbot:
     def setup_models(self):
         """تهيئة نماذج mBERT"""
         try:
-            self.tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased')
+            self.tokenizer = AutoTokenizer.from_pretrained('bert-base-multilingual-cased')
             self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
             model = BertForSequenceClassification.from_pretrained('bert-base-multilingual-cased')
