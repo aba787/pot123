@@ -1273,6 +1273,4 @@ def process_prescription(uploaded_file):
         st.error(f"خطأ في معالجة الوصفة: {str(e)}")
 
 if __name__ == "__main__":
-    main()
-    app.run(host="0.0.0.0", port=8080)
-    # main() 
+    main() 
