@@ -524,31 +524,31 @@ class IntentClassifier:
         """Helper function to extract drugs using fuzzy matching."""
         words = user_input.lower().split()
         detected_drugs = []
-        
+
         # قائمة الكلمات المفتاحية للتجاهل
         ignore_words = [
-            'interactions', 'interaction', 'side', 'effects', 'warnings', 
-            'alternatives', 'dosage', 'dose', 'تداخل', 'تفاعل', 
+            'interactions', 'interaction', 'side', 'effects', 'warnings',
+            'alternatives', 'dosage', 'dose', 'تداخل', 'تفاعل',
             'أعراض', 'جانبية', 'تحذيرات', 'بدائل', 'جرعة'
         ]
-        
+
         # فحص الكلمات منفردة (مع تجاهل الكلمات المفتاحية)
         for word in words:
             if len(word) > 3 and word not in ignore_words:
                 matched_drug, score = self.fuzzy_match_drug(word)
                 if score > 0.6:  # نسبة تشابه متوسطة
                     detected_drugs.append(matched_drug)
-        
+
         # فحص العبارة كاملة (بعد إزالة الكلمات المفتاحية)
         cleaned_input = user_input.lower()
         for ignore_word in ignore_words:
             cleaned_input = cleaned_input.replace(ignore_word, '').strip()
-        
+
         if len(cleaned_input) > 3:
             matched_drug, score = self.fuzzy_match_drug(cleaned_input)
             if score > 0.6:
                 detected_drugs.append(matched_drug)
-        
+
         return list(set(detected_drugs))
 
     def detect_intent(self, user_input: str, language: str) -> str:
@@ -559,7 +559,7 @@ class IntentClassifier:
         detected_drugs = self.symptom_parser.extract_drug_names(user_input)
         fuzzy_drugs = self._extract_drugs_with_fuzzy(user_input)
         all_detected_drugs = list(set(detected_drugs + fuzzy_drugs))
-        
+
         if all_detected_drugs:
             # فحص Intent patterns للأدوية مع أولوية للأوامر المحددة
             for intent, patterns in self.intent_patterns.items():
@@ -576,11 +576,11 @@ class IntentClassifier:
                             return 'GET_SIDE_EFFECTS'
                         elif intent == 'GET_WARNINGS':
                             return 'GET_WARNINGS'
-            
+
             # إذا كان فيه دوائين أو أكثر = تداخل
             if len(all_detected_drugs) >= 2:
                 return 'GET_INTERACTION'
-            
+
             # أي دواء منفرد = معلومات الدواء
             return 'GET_DRUG_INFO'
 
@@ -1273,4 +1273,4 @@ def process_prescription(uploaded_file):
         st.error(f"خطأ في معالجة الوصفة: {str(e)}")
 
 if __name__ == "__main__":
-    main() 
+    main()
