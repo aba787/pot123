@@ -1,6 +1,4 @@
 import streamlit as st
-import torch
-from transformers import AutoTokenizer, BertForSequenceClassification, pipeline
 from PIL import Image
 import pandas as pd
 import numpy as np
@@ -699,22 +697,13 @@ class AdvancedMedicalChatbot:
         self.intent_classifier = IntentClassifier()
 
     def setup_models(self):
-        """تهيئة نماذج mBERT"""
+        """تهيئة النظام بدون مكتبة transformers"""
         try:
-            self.tokenizer = AutoTokenizer.from_pretrained('bert-base-multilingual-cased')
-            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-            model = BertForSequenceClassification.from_pretrained('bert-base-multilingual-cased')
-            self.classifier = pipeline(
-                "text-classification",
-                model=model,
-                tokenizer=self.tokenizer,
-                device=0 if torch.cuda.is_available() else -1
-            )
-
+            # النظام يعمل بدون نماذج ML معقدة
+            # يعتمد على قواعد السلامة والتطابق النصي
             st.success("✅ تم تحميل النظام المحسّن مع قواعد السلامة!")
         except Exception as e:
-            st.error(f"خطأ في تحميل النماذج: {str(e)}")
+            st.error(f"خطأ في تحميل النظام: {str(e)}")
 
     def process_query(self, user_input: str, language: str) -> str:
         """معالجة الاستفسار مع Intent Classifier الجديد"""
