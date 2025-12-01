@@ -1,0 +1,56 @@
+
+{
+  "project_info": {
+    "name": "AdvancedMedicalChatbot",
+    "version": "2.0",
+    "description": "بوت طبي متقدم مع قواعد السلامة الشاملة",
+    "created_date": "2024-12-27",
+    "language_support": ["Arabic", "English"]
+  },
+  "drug_database": {
+    "paracetamol": {
+      "name_ar": "باراسيتامول",
+      "name_en": "Paracetamol",
+      "brand_names": ["بندول", "فيفادول", "أدول", "تايلينول"],
+      "concentrations": ["500mg", "1000mg", "120mg/5ml"],
+      "general_use_ar": "مسكن للألم وخافض للحرارة",
+      "general_use_en": "Pain reliever and fever reducer",
+      "interactions_ar": ["الكحول", "الوارفارين"],
+      "interactions_en": ["Alcohol", "Warfarin"],
+      "warnings_ar": ["لا يتجاوز 4 جرام يومياً", "حذار من أمراض الكبد"],
+      "warnings_en": ["Do not exceed 4g daily", "Caution with liver disease"],
+      "alternatives_ar": ["إيبوبروفين", "أسبرين"],
+      "alternatives_en": ["Ibuprofen", "Aspirin"],
+      "danger_level": "low"
+    },
+    "augmentin": {
+      "name_ar": "أوجمنتين", 
+      "name_en": "Augmentin",
+      "brand_names": ["كلافوكس", "أوجمين"],
+      "concentrations": ["625mg", "1g", "228mg/5ml"],
+      "general_use_ar": "مضاد حيوي واسع المجال",
+      "general_use_en": "Broad spectrum antibiotic",
+      "interactions_ar": ["مضادات التجلط", "المكملات الحديدية"],
+      "interactions_en": ["Blood thinners", "Iron supplements"],
+      "warnings_ar": ["إكمال الكورس كاملاً", "حذار من الحساسية"],
+      "warnings_en": ["Complete full course", "Caution with allergies"],
+      "alternatives_ar": ["أموكسيل", "كلافوكس"],
+      "alternatives_en": ["Amoxil", "Clavox"],
+      "danger_level": "medium"
+    }
+  },
+  "safety_keywords": {
+    "children": {
+      "ar": ["طفل", "طفلي", "ولدي", "بنتي", "عمره", "عمرها", "رضيع"],
+      "en": ["child", "baby", "infant", "kid", "years old", "months old"]
+    },
+    "pregnancy": {
+      "ar": ["حامل", "حمل", "مرضعة", "رضاعة", "الحمل"],
+      "en": ["pregnant", "pregnancy", "breastfeeding", "nursing"]
+    },
+    "emergency": {
+      "ar": ["ضيق نفس", "ألم صدر", "إغماء", "تورم وجه", "نوبة قلبية"],
+      "en": ["chest pain", "shortness of breath", "fainting", "heart attack"]
+    }
+  }
+}
