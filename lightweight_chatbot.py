@@ -285,49 +285,105 @@ def main():
         layout="wide"
     )
     
+    # Header مع معلومات المشروع
     st.title("💊 البوت الطبي الآمن - النسخة الخفيفة")
     st.markdown("### Safe Medical Bot - Lightweight Version")
+    
+    # معلومات سريعة عن المشروع
+    with st.expander("ℹ️ معلومات عن المشروع", expanded=False):
+        st.markdown("""
+        **مشروع البوت الطبي المتقدم مع قواعد السلامة الشاملة**
+        
+        ✅ **المميزات الأساسية:**
+        - نظام أمان شامل 100%
+        - منع جرعات الأطفال والحوامل
+        - تحديد حالات الطوارئ فوراً
+        - دعم ثنائي اللغة (عربي - إنجليزي)
+        - قاعدة بيانات شاملة للأدوية
+        """)
     
     # تهيئة البوت
     if 'bot' not in st.session_state:
         st.session_state.bot = LightweightMedicalBot()
         st.session_state.chat_history = []
     
-    # الشريط الجانبي
+    # الشريط الجانبي مع إحصائيات
     with st.sidebar:
-        st.header("قواعد السلامة")
+        st.header("🔒 قواعد السلامة")
         st.success("✅ منع جرعات الأطفال")
         st.success("✅ منع وصف للحوامل") 
         st.success("✅ تحويل الطوارئ")
         st.success("✅ بدون جرعات نهائياً")
         
-        if st.button("مسح المحادثة"):
+        st.header("📊 إحصائيات النظام")
+        st.info(f"عدد الأدوية المتاحة: {len(st.session_state.bot.drug_database)}")
+        st.info(f"عدد المحادثات: {len(st.session_state.chat_history)}")
+        
+        st.header("💡 أمثلة للاستخدام")
+        st.code("معلومات عن بندول")
+        st.code("بدائل أوجمنتين")
+        st.code("تداخل الأدوية")
+        st.code("Information about Paracetamol")
+        
+        if st.button("🗑️ مسح المحادثة"):
             st.session_state.chat_history = []
             st.rerun()
     
-    # عرض تاريخ المحادثة
+    # عرض تاريخ المحادثة مع تحسينات
     if st.session_state.chat_history:
+        st.subheader("💬 سجل المحادثة")
         for i, (user_msg, bot_response, timestamp) in enumerate(st.session_state.chat_history):
             with st.container():
-                st.markdown(f"**أنت ({timestamp}):** {user_msg}")
-                st.markdown(f"**البوت:** {bot_response}")
+                col1, col2 = st.columns([1, 10])
+                with col1:
+                    st.markdown("👤")
+                with col2:
+                    st.markdown(f"**[{timestamp}]** {user_msg}")
+                
+                col1, col2 = st.columns([1, 10])
+                with col1:
+                    st.markdown("🤖")
+                with col2:
+                    st.markdown(bot_response)
+                
                 if i < len(st.session_state.chat_history) - 1:
-                    st.markdown("---")
+                    st.divider()
     
-    # إدخال الرسالة
-    user_input = st.text_area(
-        "اكتب رسالتك:",
-        placeholder="مثال: معلومات عن بندول، أو بدائل أوجمنتين"
+    # منطقة الإدخال محسنة
+    st.subheader("✍️ اكتب استفسارك")
+    
+    col1, col2 = st.columns([4, 1])
+    
+    with col1:
+        user_input = st.text_area(
+            "رسالتك:",
+            placeholder="مثال: معلومات عن بندول، أو بدائل أوجمنتين، أو Information about Paracetamol",
+            height=100,
+            label_visibility="collapsed"
+        )
+    
+    with col2:
+        st.markdown("<br>", unsafe_allow_html=True)  # مسافة
+        if st.button("📤 إرسال", type="primary", use_container_width=True):
+            if user_input and user_input.strip():
+                with st.spinner("جاري المعالجة..."):
+                    language = st.session_state.bot.detect_language(user_input)
+                    response = st.session_state.bot.process_query(user_input.strip(), language)
+                    
+                    timestamp = datetime.now().strftime("%H:%M:%S")
+                    st.session_state.chat_history.append((user_input.strip(), response, timestamp))
+                    st.rerun()
+            else:
+                st.warning("يرجى كتابة رسالة قبل الإرسال")
+    
+    # Footer
+    st.markdown("---")
+    st.markdown(
+        "<div style='text-align: center; color: gray;'>"
+        "🏥 مشروع البوت الطبي المتقدم | تم التطوير لأغراض تعليمية | لا يغني عن الاستشارة الطبية"
+        "</div>",
+        unsafe_allow_html=True
     )
-    
-    if st.button("إرسال", type="primary"):
-        if user_input:
-            language = st.session_state.bot.detect_language(user_input)
-            response = st.session_state.bot.process_query(user_input, language)
-            
-            timestamp = datetime.now().strftime("%H:%M:%S")
-            st.session_state.chat_history.append((user_input, response, timestamp))
-            st.rerun()
 
 if __name__ == "__main__":
     main()

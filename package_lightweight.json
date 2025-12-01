@@ -1,0 +1,32 @@
+
+{
+  "name": "lightweight-medical-chatbot",
+  "version": "2.0.0",
+  "description": "النسخة الخفيفة من البوت الطبي المتقدم - Lightweight Advanced Medical Chatbot",
+  "main": "lightweight_chatbot.py",
+  "scripts": {
+    "start": "python run_lightweight.py",
+    "dev": "streamlit run lightweight_chatbot.py --server.port=5000",
+    "install": "pip install streamlit"
+  },
+  "keywords": [
+    "medical",
+    "chatbot", 
+    "arabic",
+    "healthcare",
+    "streamlit",
+    "lightweight"
+  ],
+  "author": "Medical Development Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "Advanced Medical Chatbot - Lightweight Version"
+  },
+  "engines": {
+    "python": ">=3.7"
+  },
+  "dependencies": {
+    "streamlit": ">=1.28.0"
+  }
+}
