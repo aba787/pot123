@@ -90,6 +90,42 @@ class LightweightMedicalBot:
         text = text.replace('ى', 'ي').replace('ة', 'ه')
         return text.strip()
     
+    def check_symptom_query(self, query: str) -> Optional[List[str]]:
+        """فحص استفسارات الأعراض وربطها بالأدوية المناسبة"""
+        symptom_map = {
+            "صداع": ["باراسيتامول", "بندول"],
+            "حرارة": ["باراسيتامول", "بندول"],
+            "سخونة": ["باراسيتامول", "بندول"],
+            "زكام": ["باراسيتامول"],
+            "برد": ["باراسيتامول"],
+            "التهاب": ["أوجمنتين"],
+            "بكتيريا": ["أوجمنتين"],
+            "عدوى": ["أوجمنتين"],
+            "ألم": ["باراسيتامول", "بندول"],
+            "وجع": ["باراسيتامول", "بندول"],
+            "headache": ["باراسيتامول", "بندول"],
+            "fever": ["باراسيتامول", "بندول"],
+            "pain": ["باراسيتامول", "بندول"],
+            "cold": ["باراسيتامول"],
+            "infection": ["أوجمنتين"],
+            "bacterial": ["أوجمنتين"]
+        }
+        
+        query_lower = query.lower()
+        query_normalized = self.normalize_arabic_text(query)
+        
+        for symptom, drugs in symptom_map.items():
+            symptom_normalized = self.normalize_arabic_text(symptom)
+            if (symptom in query_lower or 
+                symptom_normalized in query_normalized or
+                f"دواء {symptom}" in query_lower or
+                f"للـ{symptom}" in query_lower or
+                f"لل{symptom}" in query_lower or
+                f"medicine for {symptom}" in query_lower):
+                return drugs
+        
+        return None
+
     def smart_search(self, query: str) -> Optional[str]:
         """البحث الذكي في قاعدة البيانات"""
         query_normalized = self.normalize_arabic_text(query)
@@ -214,7 +250,34 @@ class LightweightMedicalBot:
         
         # إذا كانت النية طبية، نتابع البحث
         if intent_filter == "medical":
-            # البحث عن دواء
+            # أولاً: فحص استفسارات الأعراض
+            symptom_result = self.check_symptom_query(user_input)
+            if symptom_result:
+                if language == 'ar':
+                    response = "🔎 بناءً على الأعراض، هذه الأدوية مناسبة:\n\n"
+                    for drug in symptom_result:
+                        # البحث عن معلومات الدواء
+                        drug_key = self.find_drug(drug)
+                        if drug_key and drug_key in self.drug_database:
+                            drug_info = self.drug_database[drug_key]
+                            response += f"💊 **{drug_info.get('name_ar', drug)}** - {drug_info.get('general_use_ar', 'مسكن وخافض حرارة')}\n"
+                        else:
+                            response += f"💊 **{drug}** - مسكن وخافض حرارة\n"
+                    response += "\n⚠️ **مهم:** استشر الصيدلي للجرعة المناسبة"
+                else:
+                    response = "🔎 Based on symptoms, these medications are suitable:\n\n"
+                    for drug in symptom_result:
+                        # البحث عن معلومات الدواء
+                        drug_key = self.find_drug(drug)
+                        if drug_key and drug_key in self.drug_database:
+                            drug_info = self.drug_database[drug_key]
+                            response += f"💊 **{drug_info.get('name_en', drug)}** - {drug_info.get('general_use_en', 'pain reliever and fever reducer')}\n"
+                        else:
+                            response += f"💊 **{drug}** - pain reliever and fever reducer\n"
+                    response += "\n⚠️ **Important:** Consult pharmacist for proper dosage"
+                return response
+            
+            # ثانياً: البحث عن دواء محدد
             drug_key = self.find_drug(user_input)
             if not drug_key:
                 return self.handle_unknown_drug(user_input, language)
