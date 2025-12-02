@@ -82,17 +82,55 @@ class LightweightMedicalBot:
         
         return {'violation': False}
     
-    def find_drug(self, text: str) -> Optional[str]:
-        """البحث عن دواء في النص"""
-        text_lower = text.lower()
+    def normalize_arabic_text(self, text: str) -> str:
+        """تطبيع النص العربي"""
+        text = text.lower()
+        # إزالة الهمزات
+        text = text.replace('أ', 'ا').replace('إ', 'ا').replace('آ', 'ا')
+        text = text.replace('ى', 'ي').replace('ة', 'ه')
+        return text.strip()
+    
+    def smart_search(self, query: str) -> Optional[str]:
+        """البحث الذكي في قاعدة البيانات"""
+        query_normalized = self.normalize_arabic_text(query)
+        query_lower = query.lower()
         
-        # البحث المباشر
+        # 1. البحث المباشر في أسماء الأدوية والأسماء التجارية
         for synonym, drug_key in self.drug_synonyms.items():
-            if synonym in text_lower:
+            if synonym in query_lower or synonym in query_normalized:
                 return drug_key
         
-        # البحث التقريبي
-        words = text_lower.split()
+        # 2. البحث في الاستخدامات (general_use)
+        for drug_key, drug_info in self.drug_database.items():
+            # البحث في الاستخدام العربي
+            use_ar = drug_info.get('general_use_ar', '').lower()
+            use_ar_normalized = self.normalize_arabic_text(use_ar)
+            
+            # البحث في الاستخدام الإنجليزي
+            use_en = drug_info.get('general_use_en', '').lower()
+            
+            # فحص الكلمات المفتاحية
+            search_terms = [
+                # كلمات الصداع
+                'صداع', 'headache', 'رأس', 'head',
+                # كلمات الألم
+                'ألم', 'pain', 'وجع', 'ache',
+                # كلمات الحرارة
+                'حرارة', 'fever', 'سخونة', 'temperature',
+                # كلمات المضاد الحيوي
+                'التهاب', 'infection', 'بكتيريا', 'bacterial',
+                # كلمات عامة
+                'مسكن', 'painkiller', 'خافض', 'reducer'
+            ]
+            
+            for term in search_terms:
+                term_normalized = self.normalize_arabic_text(term)
+                if ((term in query_lower or term_normalized in query_normalized) and
+                    (term in use_ar or term_normalized in use_ar_normalized or term in use_en)):
+                    return drug_key
+        
+        # 3. البحث التقريبي في أسماء الأدوية
+        words = query_lower.split()
         for word in words:
             if len(word) > 3:
                 matches = difflib.get_close_matches(word, self.drug_synonyms.keys(), n=1, cutoff=0.7)
@@ -100,6 +138,10 @@ class LightweightMedicalBot:
                     return self.drug_synonyms[matches[0]]
         
         return None
+    
+    def find_drug(self, text: str) -> Optional[str]:
+        """البحث عن دواء في النص باستخدام البحث الذكي"""
+        return self.smart_search(text)
     
     def detect_intent(self, user_input: str) -> str:
         """كشف نية المستخدم"""
@@ -281,26 +323,51 @@ class LightweightMedicalBot:
 
 ⚠️ No dosage - consult pharmacist"""
     
-    def handle_unknown_drug(self, drug_name: str, language: str) -> str:
-        """معالجة الأدوية غير المعروفة"""
+    def handle_unknown_drug(self, query: str, language: str) -> str:
+        """معالجة الاستفسارات غير المعروفة مع اقتراحات ذكية"""
+        
+        # محاولة تقديم اقتراحات حسب الكلمات المفتاحية
+        query_lower = query.lower()
+        query_normalized = self.normalize_arabic_text(query)
+        
+        suggestions = []
+        
+        # اقتراحات حسب الأعراض الشائعة
+        if any(term in query_lower or term in query_normalized for term in ['صداع', 'headache', 'رأس']):
+            suggestions.append("باراسيتامول (بندول) للصداع")
+        
+        if any(term in query_lower or term in query_normalized for term in ['حرارة', 'fever', 'سخونة']):
+            suggestions.append("باراسيتامول (بندول) لخفض الحرارة")
+        
+        if any(term in query_lower or term in query_normalized for term in ['التهاب', 'infection', 'بكتيريا']):
+            suggestions.append("أوجمنتين للالتهابات البكتيرية")
+        
         if language == 'ar':
-            return f"""🔍 الدواء '{drug_name}' غير موجود في قاعدة البيانات
+            suggestions_text = '\n• '.join(suggestions) if suggestions else "لا توجد اقتراحات محددة"
+            return f"""🔍 لم أجد معلومات محددة عن "{query}"
 
-💭 اقتراحات:
-• تأكد من الإملاء الصحيح
-• جرب الاسم التجاري (مثل: بندول، أوجمنتين)
-• استشر الصيدلي مباشرة
+💡 اقتراحات قد تفيدك:
+• {suggestions_text}
 
-💊 أدوية متاحة: باراسيتامول، بندول، أوجمنتين"""
+💭 نصائح للبحث:
+• اكتب اسم الدواء بوضوح (مثل: بندول، أوجمنتين)
+• أو اكتب العرض (مثل: دواء للصداع، دواء للحرارة)
+• استشر الصيدلي للحصول على المشورة المناسبة
+
+💊 أدوية متاحة في قاعدة البيانات: باراسيتامول، بندول، أوجمنتين"""
         else:
-            return f"""🔍 Drug '{drug_name}' not found in database
+            suggestions_text = '\n• '.join(suggestions) if suggestions else "No specific suggestions available"
+            return f"""🔍 Could not find specific information about "{query}"
 
-💭 Suggestions:
-• Check correct spelling
-• Try brand name (e.g: Panadol, Augmentin)
-• Consult pharmacist directly
+💡 Suggestions that might help:
+• {suggestions_text}
 
-💊 Available drugs: Paracetamol, Panadol, Augmentin"""
+💭 Search tips:
+• Write drug name clearly (e.g: Panadol, Augmentin)
+• Or write the symptom (e.g: medicine for headache, fever reducer)
+• Consult pharmacist for appropriate advice
+
+💊 Available drugs in database: Paracetamol, Panadol, Augmentin"""
 
 def process_user_input(user_text):
     """دالة معالجة النص الرئيسية"""
