@@ -5,6 +5,7 @@ import re
 from datetime import datetime
 from typing import Dict, List, Optional
 import difflib
+import os
 
 class LightweightMedicalBot:
     def __init__(self):
@@ -14,12 +15,19 @@ class LightweightMedicalBot:
     def load_dataset(self):
         """تحميل قاعدة البيانات من ملف JSON"""
         try:
+            if not os.path.exists('medical_dataset_final.json'):
+                st.error("❌ ملف قاعدة البيانات غير موجود: medical_dataset_final.json")
+                self.drug_database = {}
+                self.safety_keywords = {}
+                return
+                
             with open('medical_dataset_final.json', 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 self.drug_database = data.get('drug_database', {})
                 self.safety_keywords = data.get('safety_keywords', {})
-        except FileNotFoundError:
-            st.error("ملف قاعدة البيانات غير موجود")
+                
+        except Exception as e:
+            st.error(f"❌ خطأ في تحميل قاعدة البيانات: {str(e)}")
             self.drug_database = {}
             self.safety_keywords = {}
     
@@ -49,7 +57,7 @@ class LightweightMedicalBot:
                 return {
                     'violation': True,
                     'type': 'child_detected',
-                    'message': 'هذه حالة أطفال، استشر الصيدلي مباشرة.' if language == 'ar' else 'Pediatric case, consult pharmacist directly.'
+                    'message': '🚫 هذه حالة أطفال، استشر الصيدلي مباشرة.' if language == 'ar' else '🚫 Pediatric case, consult pharmacist directly.'
                 }
         
         # فحص كلمات الحوامل
@@ -59,7 +67,7 @@ class LightweightMedicalBot:
                 return {
                     'violation': True,
                     'type': 'pregnancy_detected',
-                    'message': 'الحوامل والمرضعات، استشر الصيدلي مباشرة.' if language == 'ar' else 'Pregnant/nursing women, consult pharmacist directly.'
+                    'message': '🚫 الحوامل والمرضعات، استشر الصيدلي مباشرة.' if language == 'ar' else '🚫 Pregnant/nursing women, consult pharmacist directly.'
                 }
         
         # فحص كلمات الطوارئ
@@ -110,8 +118,19 @@ class LightweightMedicalBot:
         else:
             return 'drug_info'
     
-    def process_query(self, user_input: str, language: str) -> str:
-        """معالجة الاستفسار"""
+    def detect_language(self, text: str) -> str:
+        """كشف لغة النص"""
+        arabic_chars = re.findall(r'[\u0600-\u06FF]', text)
+        return 'ar' if len(arabic_chars) > len(text) * 0.3 else 'en'
+    
+    def process_user_input(self, user_input: str) -> str:
+        """معالجة مدخل المستخدم وإرجاع الرد"""
+        if not user_input or not user_input.strip():
+            return "يرجى كتابة سؤالك أولاً"
+        
+        # كشف اللغة
+        language = self.detect_language(user_input)
+        
         # فحص السلامة أولاً
         safety_check = self.check_safety_violations(user_input, language)
         if safety_check['violation']:
@@ -160,34 +179,38 @@ class LightweightMedicalBot:
     def handle_alternatives(self, drug_info: Dict, language: str) -> str:
         """معالجة البدائل"""
         if language == 'ar':
-            alternatives = '\n• '.join(drug_info.get('alternatives_ar', []))
+            alternatives = drug_info.get('alternatives_ar', [])
+            alternatives_text = '\n• '.join(alternatives) if alternatives else "لا توجد بدائل مسجلة"
             return f"""💊 بدائل {drug_info['name_ar']}:
 
-• {alternatives}
+• {alternatives_text}
 
 👨‍⚕️ استشر الصيدلي قبل التبديل"""
         else:
-            alternatives = '\n• '.join(drug_info.get('alternatives_en', []))
+            alternatives = drug_info.get('alternatives_en', [])
+            alternatives_text = '\n• '.join(alternatives) if alternatives else "No alternatives recorded"
             return f"""💊 Alternatives to {drug_info['name_en']}:
 
-• {alternatives}
+• {alternatives_text}
 
 👨‍⚕️ Consult pharmacist before switching"""
     
     def handle_interactions(self, drug_info: Dict, language: str) -> str:
         """معالجة التداخلات"""
         if language == 'ar':
-            interactions = '\n• '.join(drug_info.get('interactions_ar', []))
+            interactions = drug_info.get('interactions_ar', [])
+            interactions_text = '\n• '.join(interactions) if interactions else "لا توجد تداخلات مسجلة"
             return f"""⚠️ تداخلات {drug_info['name_ar']}:
 
-• {interactions}
+• {interactions_text}
 
 👨‍⚕️ تجنب هذه المواد مع الدواء"""
         else:
-            interactions = '\n• '.join(drug_info.get('interactions_en', []))
+            interactions = drug_info.get('interactions_en', [])
+            interactions_text = '\n• '.join(interactions) if interactions else "No interactions recorded"
             return f"""⚠️ {drug_info['name_en']} interactions:
 
-• {interactions}
+• {interactions_text}
 
 👨‍⚕️ Avoid these substances with the medication"""
     
@@ -223,17 +246,19 @@ class LightweightMedicalBot:
     def handle_warnings(self, drug_info: Dict, language: str) -> str:
         """معالجة التحذيرات"""
         if language == 'ar':
-            warnings = '\n• '.join(drug_info.get('warnings_ar', []))
+            warnings = drug_info.get('warnings_ar', [])
+            warnings_text = '\n• '.join(warnings) if warnings else "لا توجد تحذيرات مسجلة"
             return f"""⚠️ تحذيرات مهمة لـ {drug_info['name_ar']}:
 
-• {warnings}
+• {warnings_text}
 
 👨‍⚕️ استشر طبيب قبل الاستخدام"""
         else:
-            warnings = '\n• '.join(drug_info.get('warnings_en', []))
+            warnings = drug_info.get('warnings_en', [])
+            warnings_text = '\n• '.join(warnings) if warnings else "No warnings recorded"
             return f"""⚠️ Important warnings for {drug_info['name_en']}:
 
-• {warnings}
+• {warnings_text}
 
 👨‍⚕️ Consult doctor before use"""
     
@@ -242,17 +267,17 @@ class LightweightMedicalBot:
         if language == 'ar':
             return f"""💊 {drug_info['name_ar']} ({drug_info['name_en']})
 
-🔹 الاستخدام: {drug_info['general_use_ar']}
-🔹 التحذيرات: {', '.join(drug_info.get('warnings_ar', [])[:2])}
-🔹 التداخلات: {', '.join(drug_info.get('interactions_ar', [])[:2])}
+🔹 الاستخدام: {drug_info.get('general_use_ar', 'غير محدد')}
+🔹 التحذيرات: {', '.join(drug_info.get('warnings_ar', ['لا توجد'])[:2])}
+🔹 التداخلات: {', '.join(drug_info.get('interactions_ar', ['لا توجد'])[:2])}
 
 ⚠️ بدون جرعة - استشر الصيدلي"""
         else:
             return f"""💊 {drug_info['name_en']} ({drug_info['name_ar']})
 
-🔹 Use: {drug_info['general_use_en']}
-🔹 Warnings: {', '.join(drug_info.get('warnings_en', [])[:2])}
-🔹 Interactions: {', '.join(drug_info.get('interactions_en', [])[:2])}
+🔹 Use: {drug_info.get('general_use_en', 'Not specified')}
+🔹 Warnings: {', '.join(drug_info.get('warnings_en', ['None'])[:2])}
+🔹 Interactions: {', '.join(drug_info.get('interactions_en', ['None'])[:2])}
 
 ⚠️ No dosage - consult pharmacist"""
     
@@ -263,20 +288,26 @@ class LightweightMedicalBot:
 
 💭 اقتراحات:
 • تأكد من الإملاء الصحيح
-• جرب الاسم التجاري
-• استشر الصيدلي مباشرة"""
+• جرب الاسم التجاري (مثل: بندول، أوجمنتين)
+• استشر الصيدلي مباشرة
+
+💊 أدوية متاحة: باراسيتامول، بندول، أوجمنتين"""
         else:
             return f"""🔍 Drug '{drug_name}' not found in database
 
 💭 Suggestions:
 • Check correct spelling
-• Try brand name
-• Consult pharmacist directly"""
+• Try brand name (e.g: Panadol, Augmentin)
+• Consult pharmacist directly
+
+💊 Available drugs: Paracetamol, Panadol, Augmentin"""
+
+def process_user_input(user_text):
+    """دالة معالجة النص الرئيسية"""
+    if 'bot' not in st.session_state:
+        st.session_state.bot = LightweightMedicalBot()
     
-    def detect_language(self, text: str) -> str:
-        """كشف لغة النص"""
-        arabic_chars = re.findall(r'[\u0600-\u06FF]', text)
-        return 'ar' if len(arabic_chars) > len(text) * 0.3 else 'en'
+    return st.session_state.bot.process_user_input(user_text)
 
 def main():
     st.set_page_config(
@@ -285,102 +316,66 @@ def main():
         layout="wide"
     )
     
-    # Header مع معلومات المشروع
     st.title("💊 البوت الطبي الآمن - النسخة الخفيفة")
     st.markdown("### Safe Medical Bot - Lightweight Version")
-    
-    # معلومات سريعة عن المشروع
-    with st.expander("ℹ️ معلومات عن المشروع", expanded=False):
-        st.markdown("""
-        **مشروع البوت الطبي المتقدم مع قواعد السلامة الشاملة**
-        
-        ✅ **المميزات الأساسية:**
-        - نظام أمان شامل 100%
-        - منع جرعات الأطفال والحوامل
-        - تحديد حالات الطوارئ فوراً
-        - دعم ثنائي اللغة (عربي - إنجليزي)
-        - قاعدة بيانات شاملة للأدوية
-        """)
     
     # تهيئة البوت
     if 'bot' not in st.session_state:
         st.session_state.bot = LightweightMedicalBot()
-        st.session_state.chat_history = []
+        st.success("✅ تم تحميل البوت بنجاح!")
     
-    # الشريط الجانبي مع إحصائيات
-    with st.sidebar:
-        st.header("🔒 قواعد السلامة")
-        st.success("✅ منع جرعات الأطفال")
-        st.success("✅ منع وصف للحوامل") 
-        st.success("✅ تحويل الطوارئ")
-        st.success("✅ بدون جرعات نهائياً")
-        
-        st.header("📊 إحصائيات النظام")
-        st.info(f"عدد الأدوية المتاحة: {len(st.session_state.bot.drug_database)}")
-        st.info(f"عدد المحادثات: {len(st.session_state.chat_history)}")
-        
-        st.header("💡 أمثلة للاستخدام")
-        st.code("معلومات عن بندول")
-        st.code("بدائل أوجمنتين")
-        st.code("تداخل الأدوية")
-        st.code("Information about Paracetamol")
-        
-        if st.button("🗑️ مسح المحادثة"):
-            st.session_state.chat_history = []
-            st.rerun()
+    # عرض معلومات حالة النظام
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("عدد الأدوية", len(st.session_state.bot.drug_database))
+    with col2:
+        st.metric("حالة قاعدة البيانات", "✅ متصل" if st.session_state.bot.drug_database else "❌ غير متصل")
+    with col3:
+        st.metric("نظام الأمان", "✅ فعال")
     
-    # عرض تاريخ المحادثة مع تحسينات
-    if st.session_state.chat_history:
-        st.subheader("💬 سجل المحادثة")
-        for i, (user_msg, bot_response, timestamp) in enumerate(st.session_state.chat_history):
-            with st.container():
-                col1, col2 = st.columns([1, 10])
-                with col1:
-                    st.markdown("👤")
-                with col2:
-                    st.markdown(f"**[{timestamp}]** {user_msg}")
-                
-                col1, col2 = st.columns([1, 10])
-                with col1:
-                    st.markdown("🤖")
-                with col2:
-                    st.markdown(bot_response)
-                
-                if i < len(st.session_state.chat_history) - 1:
-                    st.divider()
+    st.markdown("---")
     
-    # منطقة الإدخال محسنة
-    st.subheader("✍️ اكتب استفسارك")
+    # واجهة الإدخال المطلوبة
+    user_input = st.text_input("اكتب سؤالك:")
     
-    col1, col2 = st.columns([4, 1])
+    if user_input:
+        with st.spinner("جاري المعالجة..."):
+            response = process_user_input(user_input)
+            st.write(response)
+    
+    # أمثلة للاستخدام
+    st.markdown("### 💡 أمثلة للتجربة:")
+    col1, col2 = st.columns(2)
     
     with col1:
-        user_input = st.text_area(
-            "رسالتك:",
-            placeholder="مثال: معلومات عن بندول، أو بدائل أوجمنتين، أو Information about Paracetamol",
-            height=100,
-            label_visibility="collapsed"
-        )
+        if st.button("معلومات عن بندول"):
+            response = process_user_input("معلومات عن بندول")
+            st.write(response)
+        
+        if st.button("بدائل أوجمنتين"):
+            response = process_user_input("بدائل أوجمنتين")
+            st.write(response)
     
     with col2:
-        st.markdown("<br>", unsafe_allow_html=True)  # مسافة
-        if st.button("📤 إرسال", type="primary", use_container_width=True):
-            if user_input and user_input.strip():
-                with st.spinner("جاري المعالجة..."):
-                    language = st.session_state.bot.detect_language(user_input)
-                    response = st.session_state.bot.process_query(user_input.strip(), language)
-                    
-                    timestamp = datetime.now().strftime("%H:%M:%S")
-                    st.session_state.chat_history.append((user_input.strip(), response, timestamp))
-                    st.rerun()
-            else:
-                st.warning("يرجى كتابة رسالة قبل الإرسال")
+        if st.button("تداخل الأدوية"):
+            response = process_user_input("تداخل باراسيتامول")
+            st.write(response)
+        
+        if st.button("Information about Paracetamol"):
+            response = process_user_input("Information about Paracetamol")
+            st.write(response)
+    
+    # تحذيرات الأمان
+    with st.expander("🚫 أمثلة محظورة - سيرفضها النظام"):
+        st.error("جرعة بندول للطفل - سيحول للصيدلي")
+        st.error("دواء آمن للحامل - سيحول للصيدلي") 
+        st.error("عندي ألم في الصدر - سيحول للطوارئ")
     
     # Footer
     st.markdown("---")
     st.markdown(
         "<div style='text-align: center; color: gray;'>"
-        "🏥 مشروع البوت الطبي المتقدم | تم التطوير لأغراض تعليمية | لا يغني عن الاستشارة الطبية"
+        "🏥 البوت الطبي الآمن | لأغراض تعليمية | لا يغني عن الاستشارة الطبية"
         "</div>",
         unsafe_allow_html=True
     )
