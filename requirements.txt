@@ -14,3 +14,9 @@ easyocr
 opencv-python
 easyocr
 python-Levenshtein
+openai
+python-dotenv
+requests
+openai
+python-dotenv
+requests
