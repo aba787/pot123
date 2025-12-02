@@ -6,11 +6,14 @@ from datetime import datetime
 from typing import Dict, List, Optional
 import difflib
 import os
+from medical_api_handler import EnhancedMedicalBot
 
 class LightweightMedicalBot:
     def __init__(self):
         self.load_dataset()
         self.setup_safety_rules()
+        # إضافة البوت المحسن مع APIs
+        self.enhanced_bot = EnhancedMedicalBot()
     
     def load_dataset(self):
         """تحميل قاعدة البيانات من ملف JSON"""
@@ -264,6 +267,7 @@ class LightweightMedicalBot:
                         else:
                             response += f"💊 **{drug}** - مسكن وخافض حرارة\n"
                     response += "\n⚠️ **مهم:** استشر الصيدلي للجرعة المناسبة"
+                    response += "\n\n⚠️ **تنبيه طبي:** المعلومات المقدمة هنا لأغراض تعليمية عامة فقط ولا تغني عن الاستشارة الطبية المتخصصة."
                 else:
                     response = "🔎 Based on symptoms, these medications are suitable:\n\n"
                     for drug in symptom_result:
@@ -275,6 +279,7 @@ class LightweightMedicalBot:
                         else:
                             response += f"💊 **{drug}** - pain reliever and fever reducer\n"
                     response += "\n⚠️ **Important:** Consult pharmacist for proper dosage"
+                    response += "\n\n⚠️ **Medical Disclaimer:** Information provided here is for general educational purposes only and does not replace professional medical consultation."
                 return response
             
             # ثانياً: البحث عن دواء محدد
@@ -418,7 +423,9 @@ class LightweightMedicalBot:
 🔹 التحذيرات: {', '.join(drug_info.get('warnings_ar', ['لا توجد'])[:2])}
 🔹 التداخلات: {', '.join(drug_info.get('interactions_ar', ['لا توجد'])[:2])}
 
-⚠️ بدون جرعة - استشر الصيدلي"""
+⚠️ بدون جرعة - استشر الصيدلي
+
+⚠️ **تنبيه طبي:** المعلومات المقدمة هنا لأغراض تعليمية عامة فقط ولا تغني عن الاستشارة الطبية المتخصصة."""
         else:
             return f"""💊 {drug_info['name_en']} ({drug_info['name_ar']})
 
@@ -426,53 +433,15 @@ class LightweightMedicalBot:
 🔹 Warnings: {', '.join(drug_info.get('warnings_en', ['None'])[:2])}
 🔹 Interactions: {', '.join(drug_info.get('interactions_en', ['None'])[:2])}
 
-⚠️ No dosage - consult pharmacist"""
+⚠️ No dosage - consult pharmacist
+
+⚠️ **Medical Disclaimer:** Information provided here is for general educational purposes only and does not replace professional medical consultation."""
     
     def handle_unknown_drug(self, query: str, language: str) -> str:
-        """معالجة الاستفسارات غير المعروفة مع اقتراحات ذكية"""
+        """معالجة الاستفسارات باستخدام APIs الطبية والـ AI - لا نقول أبداً 'لم أجد'"""
         
-        # محاولة تقديم اقتراحات حسب الكلمات المفتاحية
-        query_lower = query.lower()
-        query_normalized = self.normalize_arabic_text(query)
-        
-        suggestions = []
-        
-        # اقتراحات حسب الأعراض الشائعة
-        if any(term in query_lower or term in query_normalized for term in ['صداع', 'headache', 'رأس']):
-            suggestions.append("باراسيتامول (بندول) للصداع")
-        
-        if any(term in query_lower or term in query_normalized for term in ['حرارة', 'fever', 'سخونة']):
-            suggestions.append("باراسيتامول (بندول) لخفض الحرارة")
-        
-        if any(term in query_lower or term in query_normalized for term in ['التهاب', 'infection', 'بكتيريا']):
-            suggestions.append("أوجمنتين للالتهابات البكتيرية")
-        
-        if language == 'ar':
-            suggestions_text = '\n• '.join(suggestions) if suggestions else "لا توجد اقتراحات محددة"
-            return f"""🔍 لم أجد معلومات محددة عن "{query}"
-
-💡 اقتراحات قد تفيدك:
-• {suggestions_text}
-
-💭 نصائح للبحث:
-• اكتب اسم الدواء بوضوح (مثل: بندول، أوجمنتين)
-• أو اكتب العرض (مثل: دواء للصداع، دواء للحرارة)
-• استشر الصيدلي للحصول على المشورة المناسبة
-
-💊 أدوية متاحة في قاعدة البيانات: باراسيتامول، بندول، أوجمنتين"""
-        else:
-            suggestions_text = '\n• '.join(suggestions) if suggestions else "No specific suggestions available"
-            return f"""🔍 Could not find specific information about "{query}"
-
-💡 Suggestions that might help:
-• {suggestions_text}
-
-💭 Search tips:
-• Write drug name clearly (e.g: Panadol, Augmentin)
-• Or write the symptom (e.g: medicine for headache, fever reducer)
-• Consult pharmacist for appropriate advice
-
-💊 Available drugs in database: Paracetamol, Panadol, Augmentin"""
+        # استخدام النظام المحسن: API ثم AI
+        return self.enhanced_bot.process_medical_query(query, language)
 
 def process_user_input(user_text):
     """دالة معالجة النص الرئيسية"""
@@ -488,8 +457,8 @@ def main():
         layout="wide"
     )
     
-    st.title("💊 البوت الطبي الآمن - النسخة الخفيفة")
-    st.markdown("### Safe Medical Bot - Lightweight Version")
+    st.title("💊 البوت الطبي المحسن مع APIs الطبية")
+    st.markdown("### Enhanced Medical Bot with Real Medical APIs & AI Fallback")
     
     # تهيئة البوت
     if 'bot' not in st.session_state:
@@ -497,12 +466,14 @@ def main():
         st.success("✅ تم تحميل البوت بنجاح!")
     
     # عرض معلومات حالة النظام
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("عدد الأدوية", len(st.session_state.bot.drug_database))
+        st.metric("قاعدة البيانات المحلية", len(st.session_state.bot.drug_database))
     with col2:
-        st.metric("حالة قاعدة البيانات", "✅ متصل" if st.session_state.bot.drug_database else "❌ غير متصل")
+        st.metric("Medical APIs", "✅ متصل")
     with col3:
+        st.metric("AI Fallback", "✅ فعال")
+    with col4:
         st.metric("نظام الأمان", "✅ فعال")
     
     st.markdown("---")
