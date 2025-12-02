@@ -143,6 +143,25 @@ class LightweightMedicalBot:
         """البحث عن دواء في النص باستخدام البحث الذكي"""
         return self.smart_search(text)
     
+    def detect_intent_filter(self, query: str) -> str:
+        """فلتر النوايا قبل البحث الطبي"""
+        greetings = ["مرحبا", "هلا", "السلام عليكم", "hello", "hi", "hey", "أهلا", "سلام", "هلو"]
+        smalltalk = ["كيفك", "شلونك", "كيف الحال", "وش الاخبار", "how are you", "what's up", "كيف حالك"]
+        
+        q = query.strip().lower()
+        
+        # تحيات
+        for g in greetings:
+            if g in q:
+                return "greeting"
+        
+        # كلام عام
+        for s in smalltalk:
+            if s in q:
+                return "smalltalk"
+        
+        return "medical"
+    
     def detect_intent(self, user_input: str) -> str:
         """كشف نية المستخدم"""
         text_lower = user_input.lower()
@@ -178,30 +197,53 @@ class LightweightMedicalBot:
         if safety_check['violation']:
             return safety_check['message']
         
-        # البحث عن دواء
-        drug_key = self.find_drug(user_input)
-        if not drug_key:
-            return self.handle_unknown_drug(user_input, language)
+        # فلتر النوايا قبل البحث الطبي
+        intent_filter = self.detect_intent_filter(user_input)
         
-        drug_info = self.drug_database.get(drug_key)
-        if not drug_info:
-            return self.handle_unknown_drug(user_input, language)
+        if intent_filter == "greeting":
+            if language == 'ar':
+                return "أهلاً وسهلاً! 💊 كيف أقدر أساعدك طبياً اليوم؟"
+            else:
+                return "Hello! 💊 How can I help you medically today?"
         
-        # تحديد نوع الطلب
-        intent = self.detect_intent(user_input)
+        if intent_filter == "smalltalk":
+            if language == 'ar':
+                return "تمام الحمد لله! 😊 كيف أقدر أساعدك طبياً؟"
+            else:
+                return "I'm doing well, thank you! 😊 How can I help you medically?"
         
-        if intent == 'dosage_request':
-            return self.handle_dosage_request(drug_info, language)
-        elif intent == 'alternatives_request':
-            return self.handle_alternatives(drug_info, language)
-        elif intent == 'interaction_check':
-            return self.handle_interactions(drug_info, language)
-        elif intent == 'side_effects':
-            return self.handle_side_effects(drug_info, language)
-        elif intent == 'warnings':
-            return self.handle_warnings(drug_info, language)
+        # إذا كانت النية طبية، نتابع البحث
+        if intent_filter == "medical":
+            # البحث عن دواء
+            drug_key = self.find_drug(user_input)
+            if not drug_key:
+                return self.handle_unknown_drug(user_input, language)
+            
+            drug_info = self.drug_database.get(drug_key)
+            if not drug_info:
+                return self.handle_unknown_drug(user_input, language)
+            
+            # تحديد نوع الطلب
+            intent = self.detect_intent(user_input)
+            
+            if intent == 'dosage_request':
+                return self.handle_dosage_request(drug_info, language)
+            elif intent == 'alternatives_request':
+                return self.handle_alternatives(drug_info, language)
+            elif intent == 'interaction_check':
+                return self.handle_interactions(drug_info, language)
+            elif intent == 'side_effects':
+                return self.handle_side_effects(drug_info, language)
+            elif intent == 'warnings':
+                return self.handle_warnings(drug_info, language)
+            else:
+                return self.handle_drug_info(drug_info, language)
+        
+        # إذا لم نتمكن من تحديد النية
+        if language == 'ar':
+            return "عذراً، لم أتمكن من فهم طلبك. يرجى كتابة سؤال طبي واضح أو اسم دواء."
         else:
-            return self.handle_drug_info(drug_info, language)
+            return "Sorry, I couldn't understand your request. Please write a clear medical question or drug name."
     
     def handle_dosage_request(self, drug_info: Dict, language: str) -> str:
         """رفض إعطاء جرعات"""
